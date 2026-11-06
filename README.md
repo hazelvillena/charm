@@ -49,3 +49,6 @@ docs           CONTEXT.md (start here), PLAN.md, HANDOFF.md, adr/, DEMO.md
 
 ## Conventions
 Units are millimeters, front is +Z, up is +Y. Geometry layers never import DOM or scene code (enforced by a test). Core dims live only in `src/params/core.ts`.
+
+## Deploying (Cloudflare)
+`wrangler.jsonc` makes this a static-assets deploy: Cloudflare runs `npm run build` and uploads `dist/`. In the Cloudflare project set the build command to `npm run build` and the deploy command to `npx wrangler deploy`. The app sits behind a soft password page (`src/gate.ts`, hash only, loads the app after unlock); it keeps casual visitors out but is not real security.

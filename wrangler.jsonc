@@ -1,0 +1,8 @@
+{
+  "name": "charm",
+  "compatibility_date": "2026-11-04",
+  // build the site first, then upload dist/ as static assets (no Worker code, no Vite plugin needed)
+  "build": { "command": "npm run build" },
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
+  "observability": { "enabled": true }
+}

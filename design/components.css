@@ -172,3 +172,15 @@
   *::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: content-box; }
   *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 }
+
+/* ---- gate: a plain white page with one field ---- */
+.ui-gate { position: fixed; inset: 0; z-index: var(--z-modal, 60); display: grid; place-items: center; background: #fff; transition: opacity var(--dur-3) var(--ease); }
+.ui-gate.leaving { opacity: 0; pointer-events: none; }
+.ui-gate-card { display: grid; justify-items: center; gap: var(--s-4); width: min(300px, calc(100vw - 48px)); }
+.ui-gate-mark { width: 44px; height: 44px; filter: drop-shadow(0 3px 10px rgba(91, 108, 255, 0.3)); }
+.ui-gate-title { margin: 0; font-size: var(--t-lg); font-weight: 650; letter-spacing: -0.015em; }
+.ui-gate-form { display: grid; gap: var(--s-2); width: 100%; }
+.ui-gate-input { text-align: center; }
+.ui-gate-note { min-height: 1.4em; color: var(--ink-3); font-size: var(--t-xs); }
+.ui-gate-form.shake { animation: ui-shake 380ms var(--ease); }
+@keyframes ui-shake { 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
