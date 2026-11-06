@@ -20,7 +20,7 @@ const YN = Array.from({ length: 22 }, (_, i) => 0.08 + i * 0.04); // sample heig
 function extents(verts: ArrayLike<number>[], H: number, zOff: number) {
   return YN.map((yn) => {
     const y = yn * H;
-    const b = verts.filter((v) => Math.abs(v[0]) < 1.5 && Math.abs(v[1] - y) < 1.2);
+    const b = verts.filter((v) => Math.abs(v[1] - y) < 1.2); // a flat 2D side view: every point of the body counts, wherever it sits across the width
     if (!b.length) return { f: NaN, b: NaN };
     return { f: Math.max(...b.map((v) => v[2])) - zOff, b: Math.min(...b.map((v) => v[2])) - zOff };
   });
@@ -28,10 +28,11 @@ function extents(verts: ArrayLike<number>[], H: number, zOff: number) {
 const refExt = extents(ref, refH, GHOST_FIT.zEq);
 const FIT_MIN = 0.45; // fitted values never go thinner than this (keeps walls buildable)
 // The puck plateau is flat by design, so the front there cannot follow the reference belly: leave it out of the front fit.
-const PLATEAU_MM = 27; // flat plateau (about 15 mm) plus the blend zone
+const PLATEAU_MM = 0; // the flat core seat is off by default, so the front is fitted everywhere
 let cyMm = 25;
 (() => { const g = PRESETS[0], p = presetParams(g); const cage = new Float32Array(eng.qs.vertCount * 3); cyMm = eng.buildCage(clampOutline(g.outline, p.wall), p, cage)!.shiftY; })();
-const frontMasked = (i: number) => Math.abs(YN[i] * refH - cyMm) < PLATEAU_MM;
+// low down the front is deliberately kept fuller than the reference so the Core recess stays inside the body (see presets.ts)
+const frontMasked = (i: number) => YN[i] < 0.22 || Math.abs(YN[i] * refH - cyMm) < PLATEAU_MM;
 
 function modelExt(side: SideProfile) {
   const g = PRESETS[0], p = { ...presetParams(g), side }, o = clampOutline(g.outline, p.wall);
