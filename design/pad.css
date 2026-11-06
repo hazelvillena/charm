@@ -83,3 +83,5 @@
 .ui-pad-foot .mini-toggle { gap: 5px; color: var(--ink-3); cursor: pointer; }
 .ui-pad-foot .mini-toggle:hover, .ui-pad-foot .ui-pad-link:hover { color: var(--accent-ink); }
 .ui-pad-foot .ui-pad-link { margin-left: auto; padding: 0; }
+
+.ui-pad-fill.quiet { stroke: none; fill-opacity: 0.55; } /* soft fill only: the black result line carries the outline */

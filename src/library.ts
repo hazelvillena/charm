@@ -16,7 +16,7 @@ export type Iteration = {
 };
 
 const KEY = 'charmer-playground:v1';
-const VERSION = 12; // 2 = presets live in the library (starred); 3 = default eyes 2.4 mm; 4 = a varied material per built-in iteration; 5 = the attachment loop is off by default; 6-7 = thumbnails show the Core and eyes, in each item's own material (re-rendered)
+const VERSION = 13; // 2 = presets live in the library (starred); 3 = default eyes 2.4 mm; 4 = a varied material per built-in iteration; 5 = the attachment loop is off by default; 6-7 = thumbnails show the Core and eyes, in each item's own material (re-rendered)
 const cloneParams = (p: Params): Params => ({ ...p, side: cloneSide(p.side) });
 const newId = () => 'it_' + Math.random().toString(36).slice(2, 9);
 const make = (name: string, params: Params, outline: Outline, look: Look, starred: boolean): Iteration =>
@@ -85,6 +85,7 @@ export class Library {
         }
       }
       if (this.version < 12) { const charmer = presetItems().find((i) => i.name === 'Charmer'); for (const it of this.items) if (it.name === 'Charmer' && charmer) { it.params.side = cloneSide(charmer.params.side); it.thumb = undefined; } } // a modest back for Charmer
+      if (this.version < 13) { const arch = starterItems().find((i) => i.name === 'Arch'); for (const it of this.items) if (it.name === 'Arch' && arch) { it.outline = arch.outline; it.thumb = undefined; } } // Arch: the lower flat base that clears the Core
       this.version = VERSION; this.save();
     }
   }

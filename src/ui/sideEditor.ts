@@ -15,7 +15,7 @@ type Pick = { which: SideWhich; idx: number };
 export class SideEditor {
   readonly el: HTMLElement;
   private pad: Pad; private s: SVGSVGElement;
-  private fill: SVGPathElement; private puck: SVGRectElement; private axis: SVGLineElement; private frontNote: SVGTextElement; private backNote: SVGTextElement;
+  private fill: SVGPathElement; private ink!: SVGPathElement; private puck: SVGRectElement; private axis: SVGLineElement; private frontNote: SVGTextElement; private backNote: SVGTextElement;
   private groups: Record<SideWhich, SVGGElement>;
   private side!: SideProfile;
   private zf = 17; private zb = 13; private H = 62; private cy = 25;
@@ -29,12 +29,13 @@ export class SideEditor {
     this.pad = new Pad({ base: { cx: 0, cy: -31, w: 90, h: 90 }, label: 'Side profile, true to the 3D body. Drag points, click the outline to add one.', shape: 'tall' });
     this.s = this.pad.svg;
     this.axis = svg('line', { x1: 0, y1: 0, x2: 0, y2: -80, class: 'ui-pad-axis' }) as SVGLineElement;
-    this.fill = svg('path', { class: 'ui-pad-fill' }) as SVGPathElement;
+    this.fill = svg('path', { class: 'ui-pad-fill quiet' }) as SVGPathElement;
+    this.ink = svg('path', { class: 'ui-pad-result' }) as SVGPathElement; // the same black outline as the front canvas
     this.puck = svg('rect', { class: 'ui-pad-core', rx: 0.8 }) as SVGRectElement; this.puck.style.pointerEvents = 'none';
     this.frontNote = svg('text', { class: 'ui-pad-note' }) as SVGTextElement; this.frontNote.textContent = 'front';
     this.backNote = svg('text', { class: 'ui-pad-note', 'text-anchor': 'end' }) as SVGTextElement; this.backNote.textContent = 'back';
     this.groups = { back: svg('g') as SVGGElement, front: svg('g') as SVGGElement };
-    this.s.append(this.axis, this.fill, this.puck, this.frontNote, this.backNote, this.groups.front, this.groups.back);
+    this.s.append(this.axis, this.fill, this.ink, this.puck, this.frontNote, this.backNote, this.groups.front, this.groups.back);
     this.pad.view.onChange = () => this.render();
     this.pad.onRevert = () => this.onReset();
     this.pad.onDelete = () => this.deleteSelected();
@@ -147,7 +148,7 @@ export class SideEditor {
     if (p && p.ys.length > 1) {
       let d = ''; p.ys.forEach((y, i) => { d += `${i ? 'L' : 'M'}${(-p.front[i]).toFixed(2)} ${(-y).toFixed(2)}`; });
       for (let i = p.ys.length - 1; i >= 0; i--) d += `L${(-p.back[i]).toFixed(2)} ${(-p.ys[i]).toFixed(2)}`;
-      this.fill.setAttribute('d', d + 'Z');
+      this.fill.setAttribute('d', d + 'Z'); this.ink.setAttribute('d', d + 'Z');
     }
     const u = this.pad.unit();
     for (const which of ['back', 'front'] as SideWhich[]) {
