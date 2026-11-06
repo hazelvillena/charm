@@ -161,3 +161,14 @@
 .ui-dialog-row { padding: 2px 0; }
 .ui-dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
 @media (prefers-reduced-motion: reduce) { .ui-scrim, .ui-dialog { transition: none; } }
+
+/* ---- scrollbars: one dainty style everywhere (thin, faint grey, rounded, no track) ---- */
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+@supports selector(::-webkit-scrollbar) {
+  * { scrollbar-width: auto; scrollbar-color: auto; } /* let the thinner custom bar below apply in Chrome and Safari */
+  *::-webkit-scrollbar { width: var(--scroll-size); height: var(--scroll-size); background: transparent; }
+  *::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 999px; border: 1px solid transparent; background-clip: content-box; transition: background var(--dur-2); }
+  *::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: content-box; }
+  *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+}

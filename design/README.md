@@ -71,3 +71,6 @@ One rhythm inside every container: `--s-4` inset on all sides, `--s-4` between f
 
 ## Dialogs
 `src/ui/dialog.ts` + `.ui-scrim` / `.ui-dialog` in components.css: a soft blur over the page and one small card. Esc or a click outside cancels, Enter confirms. Used for Save: replace-or-new for a saved iteration, and name plus "Add to favourites" for a new one.
+
+## Scrollbars
+One style, set globally in components.css from `--scroll-*` tokens: 5px, faint grey, rounded, no track, darker on hover. Do not style scrollbars per component.

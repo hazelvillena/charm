@@ -37,6 +37,8 @@
   --r-md: 12px;
   --r-lg: 16px;
   --r-pill: 999px;
+  /* scrollbars: thin and faint, shown wherever something overflows */
+  --scroll-size: 5px; --scroll-thumb: rgba(110, 118, 140, 0.28); --scroll-thumb-hover: rgba(110, 118, 140, 0.5);
   /* drawing pads: every stroke and point size lives here, in screen pixels (they stay this size at any zoom) */
   --pad-line: 1.6px; --pad-hair: 1px; --pad-dot: 2.5px; --pad-dot-mirror: 1.3px; --pad-ring: 6px; --pad-hit: 9px; --pad-btn: 22px; --pad-glyph: 14px;
   --sh-container: 0 1px 2px rgba(24, 28, 52, 0.04), 0 6px 18px -10px rgba(24, 28, 52, 0.12); /* very quiet lift around containers */
