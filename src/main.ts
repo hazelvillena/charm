@@ -27,6 +27,7 @@ import { Panel } from './ui/panel';
 import { OutputsPanel } from './ui/outputs';
 import { Toolbar, ANALYSES } from './ui/toolbar';
 import { icon } from './ui/icons';
+import { replaceOrNew, nameNew } from './ui/dialog';
 import { toast } from './ui/toast';
 import { download } from './ui/download';
 import { h } from './ui/dom';
@@ -493,16 +494,31 @@ function updateSaveUi() {
   libPanel.setCanSave(s.dirty);
   saveBtn.title = unsaved ? 'Add this iteration to the library' : `Update “${s.name}” in the library`;
 }
-async function saveCurrent(asNew: boolean) {
+async function saveCurrent(opts: { asNew: boolean; name?: string; starred?: boolean }) {
   const s = store.state; let it;
-  if (s.libraryId && !asNew) it = library.update(s.libraryId, s.name, s.params, s.outline, s.look);
-  else { it = library.add(asNew && s.libraryId ? `${s.name} copy` : s.name, s.params, s.outline, s.look); s.name = it.name; nameField.value = it.name; }
+  if (s.libraryId && !opts.asNew) it = library.update(s.libraryId, s.name, s.params, s.outline, s.look);
+  else {
+    it = library.add(opts.name ?? s.name, s.params, s.outline, s.look); s.name = it.name; nameField.value = it.name;
+    if (opts.starred) library.toggleStar(it.id);
+  }
   if (!it) return;
   captureBaseline(); s.libraryId = it.id; s.dirty = false; updateSaveUi(); renderChips(); libPanel.setCurrent(it.id); updateHash();
-  await refreshLibrary([it]); toast('Saved');
+  await refreshLibrary([it]); toast(opts.asNew || !s.libraryId ? 'Saved as new' : 'Saved');
 }
-saveBtn.addEventListener('click', () => saveCurrent(false)); saveNewBtn.addEventListener('click', () => saveCurrent(true));
-libPanel.onSave = () => { saveCurrent(true); };
+/** Save: a saved iteration asks replace-or-new; a new one asks for a name. */
+async function askNewAndSave() {
+  const s = store.state, r = await nameNew(s.libraryId ? `${s.name} copy` : s.name || 'Untitled');
+  if (r) await saveCurrent({ asNew: true, name: r.name, starred: r.starred });
+}
+async function requestSave() {
+  const s = store.state;
+  if (!s.libraryId) { await askNewAndSave(); return; }
+  const choice = await replaceOrNew(s.name);
+  if (choice === 'replace') await saveCurrent({ asNew: false });
+  else if (choice === 'new') await askNewAndSave();
+}
+saveBtn.addEventListener('click', () => requestSave()); saveNewBtn.addEventListener('click', () => askNewAndSave());
+libPanel.onSave = () => { askNewAndSave(); };
 function loadIteration(id: string) {
   const it = library.get(id); if (!it || store.state.mode !== 'explore') return;
   const toParams = { ...it.params, ...globalsNow() } as Params;

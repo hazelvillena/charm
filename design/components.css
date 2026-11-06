@@ -148,3 +148,16 @@
 .ui-num-input.tick { animation: ui-tick var(--dur-2) var(--ease); }
 .ui-unit { color: var(--ink-3); font-size: var(--t-xs); }
 @keyframes ui-tick { 0% { color: var(--accent-ink); } 100% { color: var(--ink); } }
+
+/* ---- modal dialog over a soft blur ---- */
+.ui-scrim { position: fixed; inset: 0; z-index: var(--z-modal, 60); display: grid; place-items: center; padding: var(--s-4); background: rgba(247, 247, 245, 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); pointer-events: auto; transition: background var(--dur-3) var(--ease), backdrop-filter var(--dur-3) var(--ease), -webkit-backdrop-filter var(--dur-3) var(--ease); }
+.ui-scrim.shown { background: rgba(247, 247, 245, 0.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ui-dialog { width: min(360px, 100%); display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r-lg, 16px); background: var(--surface); box-shadow: var(--sh-container), 0 24px 60px -24px rgba(24, 28, 52, 0.35); opacity: 0; transform: translateY(8px) scale(0.98); transition: opacity var(--dur-3) var(--ease), transform var(--dur-3) var(--ease); }
+.ui-scrim.shown .ui-dialog { opacity: 1; transform: none; }
+.ui-dialog-title { margin: 0; font-size: var(--t-lg); font-weight: 650; letter-spacing: -0.015em; }
+.ui-dialog-text { margin: 0; color: var(--ink-2); line-height: 1.5; }
+.ui-dialog-input { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font: inherit; }
+.ui-dialog-input:focus { outline: 2px solid var(--accent-ring); border-color: var(--accent); background: var(--surface); }
+.ui-dialog-row { padding: 2px 0; }
+.ui-dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
+@media (prefers-reduced-motion: reduce) { .ui-scrim, .ui-dialog { transition: none; } }

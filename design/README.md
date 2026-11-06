@@ -68,3 +68,6 @@ One rhythm inside every container: `--s-4` inset on all sides, `--s-4` between f
 
 ## Poche (section hatching)
 `design/poche.ts` holds the one token set for cut faces: paper, a soft slate hatch colour, the ink outline, and per-part angle, spacing (mm) and line width. Change the look of every section there; `src/scene/section.ts` reads only these tokens.
+
+## Dialogs
+`src/ui/dialog.ts` + `.ui-scrim` / `.ui-dialog` in components.css: a soft blur over the page and one small card. Esc or a click outside cancels, Enter confirms. Used for Save: replace-or-new for a saved iteration, and name plus "Add to favourites" for a new one.

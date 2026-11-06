@@ -41,7 +41,7 @@
   --pad-line: 1.6px; --pad-hair: 1px; --pad-dot: 2.5px; --pad-dot-mirror: 1.3px; --pad-ring: 6px; --pad-hit: 9px; --pad-btn: 22px; --pad-glyph: 14px;
   --sh-container: 0 1px 2px rgba(24, 28, 52, 0.04), 0 6px 18px -10px rgba(24, 28, 52, 0.12); /* very quiet lift around containers */
   /* stacking: canvas UI lives inside the stage (its own context) and can never slip behind a column */
-  --z-stage: 1; --z-column: 2; --z-bar: 12; --z-edge: 20; --z-drawer: 30; --z-popover: 40;
+  --z-stage: 1; --z-column: 2; --z-bar: 12; --z-edge: 20; --z-drawer: 30; --z-popover: 40; --z-modal: 60;
 
   /* space */
   --s-1: 4px;
