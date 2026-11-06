@@ -1,0 +1,67 @@
+/* Clayground design tokens. The ONLY place raw colors, sizes and motion values live.
+   App and component CSS must reference these variables (see design/README.md). */
+:root {
+  /* color: surfaces and ink */
+  --canvas: #f4f4f1;        /* 3D stage */
+  --surface: #ffffff;       /* panels, cards */
+  --surface-2: #fafaf8;     /* inset wells */
+  --ink: #0f1117;
+  --ink-2: #4a4e5a;
+  --ink-3: #8a8e99;
+  --line: #e7e7e2;
+  --line-strong: #d5d5ce;
+  /* color: accent (periwinkle) */
+  --accent: #5b6cff;
+  --accent-ink: #3b49d6;
+  --accent-soft: #eef0ff;
+  --accent-ring: rgba(91, 108, 255, 0.35);
+  /* color: status */
+  --ok: #2fa66a;
+  --bad: #e5484d;
+  --warn: #e0a100;
+  --heat-hot: #e5484d;
+  --heat-mid: #f2b36b;
+
+  /* type */
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, -apple-system, 'SF Pro Text', system-ui, 'Segoe UI', sans-serif; /* self-hosted (npm @fontsource-variable/instrument-sans): a refined grotesque that stays legible at small sizes */
+  --t-xs: 11px;
+  --t-sm: 12px;
+  --t-md: 13px;
+  --t-lg: 15px;
+  --t-xl: 22px;
+  --t-num: 26px;
+
+  /* shape */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  /* drawing pads: every stroke and point size lives here, in screen pixels (they stay this size at any zoom) */
+  --pad-line: 1.6px; --pad-hair: 1px; --pad-dot: 2.5px; --pad-dot-mirror: 1.3px; --pad-ring: 6px; --pad-hit: 9px; --pad-btn: 22px; --pad-glyph: 14px;
+  --sh-container: 0 1px 2px rgba(24, 28, 52, 0.04), 0 6px 18px -10px rgba(24, 28, 52, 0.12); /* very quiet lift around containers */
+  /* stacking: canvas UI lives inside the stage (its own context) and can never slip behind a column */
+  --z-stage: 1; --z-column: 2; --z-bar: 12; --z-edge: 20; --z-drawer: 30; --z-popover: 40;
+
+  /* space */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+
+  /* elevation (kept very light) */
+  --sh-1: 0 1px 2px rgba(15, 17, 23, 0.06);
+  --sh-2: 0 8px 28px rgba(15, 17, 23, 0.1);
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 420ms;
+  --dur-unroll: 760ms; --ease-unroll: cubic-bezier(0.55, 0.05, 0.15, 1); /* eases in, then a long soft landing: for things that unroll (you can watch it happen) */
+
+  /* layout */
+  --col-inputs: clamp(284px, 23vw, 320px);
+  --col-outputs: clamp(284px, 23vw, 320px);
+}

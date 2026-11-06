@@ -1,19 +1,12 @@
 import { Outline, cloneOutline } from './params/outline';
 import { Params, defaultParams } from './params/schema';
 import { PRESETS, presetParams } from './params/presets';
+import { DEFAULT_LOOK, Look } from '../design/finishes';
 
 export type Mode = 'explore' | 'accepted';
-export type ViewMode = 'smooth' | 'cage' | 'both';
+export type ViewMode = 'shaded' | 'ghost' | 'section' | 'cage';
+export type Analysis = 'none' | 'draft' | 'curvature' | 'zebra';
 export type ChangeKind = 'shape' | 'view' | 'mode' | 'checks' | 'result';
-
-export const COLORS: { id: string; label: string; hex: string; metal?: boolean }[] = [
-  { id: 'lavender', label: 'Lavender', hex: '#C9C3F2' },
-  { id: 'sky', label: 'Sky', hex: '#A9C4F5' },
-  { id: 'butter', label: 'Butter', hex: '#F4D35E' },
-  { id: 'blush', label: 'Blush', hex: '#F6C1B5' },
-  { id: 'cream', label: 'Cream', hex: '#F3EEE3' },
-  { id: 'chrome', label: 'Chrome', hex: '#E4E6EA', metal: true },
-];
 
 export type State = {
   params: Params;
@@ -21,17 +14,21 @@ export type State = {
   presetId: string | null;
   mode: Mode;
   view: ViewMode;
-  heatmap: boolean;
+  analysis: Analysis;
   exploded: boolean;
   refGhost: boolean;
-  color: string;
+  showSplit: boolean;
+  look: Look;
+  name: string;            // the iteration's name (editable on the stage)
+  libraryId: string | null; // set when this iteration was saved to / loaded from the library
+  dirty: boolean;          // edited since it was loaded or saved (shows the Save button)
 };
 
 export function initialState(): State {
   const g = PRESETS[0];
   return {
     params: presetParams(g), outline: cloneOutline(g.outline), presetId: g.id,
-    mode: 'explore', view: 'smooth', heatmap: false, exploded: true, refGhost: false, color: 'lavender',
+    mode: 'explore', view: 'shaded', analysis: 'none', exploded: true, refGhost: false, showSplit: true, look: { ...DEFAULT_LOOK }, name: g.name, libraryId: null, dirty: false,
   };
 }
 

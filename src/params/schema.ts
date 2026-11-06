@@ -1,43 +1,51 @@
-export type GroupId = 'body' | 'face' | 'attach' | 'mfg';
+import { SideProfile, defaultSide, clampSide } from './side';
+import { MATERIALS, MaterialId } from '../../design/finishes';
+
+export type GroupId = 'body' | 'face' | 'attach' | 'mfg' | 'look';
 export type ParamDef = {
   id: keyof Params; label: string; group: GroupId;
-  kind: 'range' | 'enum';
+  kind: 'range' | 'enum' | 'toggle';
   min?: number; max?: number; step?: number; options?: string[];
-  default: number | string; unit?: 'mm' | ''; hint?: string;
+  default: number | string | boolean; unit?: 'mm' | ''; hint?: string;
 };
 
 export type Params = {
-  depth: number; belly: number; backFlat: number; plateau: number;
-  eyeSize: number; eyeSpacing: number; eyeHeight: number; eyeType: 'inset' | 'raised' | 'flush';
-  nookPos: 'top' | 'top-left' | 'top-right';
-  wall: number; splitZ: number; material: 'PC' | 'ABS' | 'Silicone' | 'Zinc';
+  depth: number; belly: number; backFlat: number; plateau: number; corePlateau: boolean;
+  eyes: 'two' | 'one' | 'none'; eyeSize: number; eyeSpacing: number; eyeHeight: number; eyeType: 'inset' | 'raised' | 'flush';
+  loop: boolean; nookPos: 'top' | 'top-left' | 'top-right';
+  wall: number; splitZ: number; material: MaterialId;
+  side: SideProfile;
 };
 
 export const GROUPS: { id: GroupId; label: string; open: boolean }[] = [
   { id: 'body', label: 'Body volume', open: true },
-  { id: 'face', label: 'Face', open: true },
+  { id: 'face', label: 'Identity', open: true },
   { id: 'attach', label: 'Attachment', open: false },
-  { id: 'mfg', label: 'Manufacturing', open: true },
+  { id: 'mfg', label: 'Shell', open: true },
 ];
 
 export const SCHEMA: ParamDef[] = [
-  { id: 'depth', label: 'Depth', group: 'body', kind: 'range', min: 10, max: 42, step: 0.5, default: 30, unit: 'mm', hint: 'overall front to back' },
-  { id: 'belly', label: 'Belly', group: 'body', kind: 'range', min: 0, max: 1, step: 0.01, default: 0.5, hint: 'shifts depth toward the front' },
-  { id: 'backFlat', label: 'Back flatness', group: 'body', kind: 'range', min: 0, max: 1, step: 0.01, default: 0.5, hint: 'flatter back sits against a bag' },
-  { id: 'plateau', label: 'Puck plateau', group: 'body', kind: 'range', min: 0, max: 1, step: 0.01, default: 0.8, hint: 'flat area around the puck seat' },
-  { id: 'eyeSize', label: 'Eye size', group: 'face', kind: 'range', min: 1, max: 4, step: 0.1, default: 1.8, unit: 'mm' },
-  { id: 'eyeSpacing', label: 'Eye spacing', group: 'face', kind: 'range', min: 3, max: 12, step: 0.1, default: 5.5, unit: 'mm' },
-  { id: 'eyeHeight', label: 'Eye height', group: 'face', kind: 'range', min: 0.55, max: 0.92, step: 0.005, default: 0.78, hint: 'fraction of height' },
+  { id: 'depth', label: 'Depth', group: 'body', kind: 'range', min: 10, max: 42, step: 0.5, default: 30, unit: 'mm' },
+  { id: 'belly', label: 'Belly', group: 'body', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.5 },
+  { id: 'backFlat', label: 'Back flatness', group: 'body', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.5 },
+  { id: 'corePlateau', label: 'Flat core seat', group: 'attach', kind: 'toggle', default: true, hint: 'Flat seat and core curvature' },
+  { id: 'plateau', label: 'Seat size', group: 'attach', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.8 },
+  { id: 'eyes', label: 'Eyes', group: 'face', kind: 'enum', options: ['two', 'one', 'none'], default: 'two', hint: 'Two eyes, a single centred eye, or none' },
+  { id: 'eyeSize', label: 'Eye size', group: 'face', kind: 'range', min: 1, max: 4, step: 0.2, default: 2.4, unit: 'mm' },
+  { id: 'eyeSpacing', label: 'Eye spacing', group: 'face', kind: 'range', min: 3, max: 12, step: 0.5, default: 5.5, unit: 'mm' },
+  { id: 'eyeHeight', label: 'Eye height', group: 'face', kind: 'range', min: 0.55, max: 0.92, step: 0.005, default: 0.78 },
   { id: 'eyeType', label: 'Eye type', group: 'face', kind: 'enum', options: ['inset', 'raised', 'flush'], default: 'inset' },
-  { id: 'nookPos', label: 'Nook position', group: 'attach', kind: 'enum', options: ['top', 'top-left', 'top-right'], default: 'top' },
-  { id: 'wall', label: 'Wall thickness', group: 'mfg', kind: 'range', min: 1.2, max: 2.5, step: 0.05, default: 1.6, unit: 'mm' },
-  { id: 'splitZ', label: 'Split line', group: 'mfg', kind: 'range', min: -0.5, max: 0.5, step: 0.01, default: 0, hint: 'fraction of depth, 0 = widest plane' },
-  { id: 'material', label: 'Material', group: 'mfg', kind: 'enum', options: ['PC', 'ABS', 'Silicone', 'Zinc'], default: 'PC' },
+  { id: 'loop', label: 'Loop', group: 'attach', kind: 'toggle', default: false },
+  { id: 'nookPos', label: 'Loop position', group: 'attach', kind: 'enum', options: ['top', 'top-left', 'top-right'], default: 'top' },
+  { id: 'wall', label: 'Wall thickness', group: 'mfg', kind: 'range', min: 1.2, max: 2.5, step: 0.1, default: 1.6, unit: 'mm' },
+  { id: 'splitZ', label: 'Split line', group: 'mfg', kind: 'range', min: -0.5, max: 0.5, step: 0.05, default: 0 },
+  { id: 'material', label: 'Material', group: 'look', kind: 'enum', options: MATERIALS.map((m) => m.id), default: 'PC/ABS' },
 ];
 
 export function defaultParams(): Params {
   const p: any = {};
   for (const d of SCHEMA) p[d.id] = d.default;
+  p.side = defaultSide();
   return p as Params;
 }
 
@@ -49,7 +57,10 @@ export function sanitizeParams(raw: any): Params {
     const v = raw[d.id];
     if (d.kind === 'range') {
       if (typeof v === 'number' && Number.isFinite(v)) out[d.id] = Math.min(d.max!, Math.max(d.min!, v));
+    } else if (d.kind === 'toggle') {
+      if (typeof v === 'boolean') out[d.id] = v;
     } else if (typeof v === 'string' && d.options!.includes(v)) out[d.id] = v;
   }
+  out.side = clampSide(raw.side);
   return out as Params;
 }

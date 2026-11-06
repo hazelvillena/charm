@@ -1,0 +1,85 @@
+/* ---- Drawing pad: the one canvas element every editor is built from (see src/ui/pad.ts) ----
+   All sizes come from the --pad-* tokens in tokens.css. Strokes are screen pixels (non-scaling), so a line is the
+   same weight at any zoom; points are sized in JS from the same tokens. */
+.ui-pad { position: relative; display: flex; flex-direction: column; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.ui-pad-svg { display: block; width: 100%; background: transparent; touch-action: none; user-select: none; cursor: default; outline: none; }
+.ui-pad-svg.square { aspect-ratio: 1; }
+.ui-pad-svg.tall { aspect-ratio: 1.15; max-height: 250px; }
+.ui-pad-svg * { vector-effect: non-scaling-stroke; }
+.ui-pad-svg.drawing { cursor: crosshair; }
+.ui-pad-svg.panning { cursor: grabbing; }
+.ui-pad-svg.moving-core .ui-pad-core { cursor: grabbing; }
+
+/* drawing layers */
+.ui-pad-ring { fill: none; stroke: var(--line); stroke-width: var(--pad-hair); stroke-dasharray: 3 3; }
+.ui-pad-axis { stroke: var(--line); stroke-width: var(--pad-hair); }
+.ui-pad-fill { fill: var(--accent-soft); fill-opacity: 0.75; stroke: var(--accent); stroke-width: var(--pad-line); stroke-linejoin: round; }
+.ui-pad-fill.guide { fill-opacity: 0.35; stroke-width: var(--pad-hair); stroke-dasharray: 4 3; stroke-opacity: 0.8; }
+.ui-pad-ref { fill: none; stroke: var(--ink-3); stroke-width: var(--pad-hair); stroke-dasharray: 4 3; }
+.ui-pad-keep { fill: rgba(91, 108, 255, 0.05); stroke: var(--accent); stroke-width: var(--pad-hair); stroke-dasharray: 3 3; }
+.ui-pad-keep.bad { stroke: var(--bad); fill: rgba(229, 72, 77, 0.08); }
+.ui-pad-core { fill: var(--surface); fill-opacity: 0.85; stroke: var(--line-strong); stroke-width: var(--pad-hair); cursor: grab; }
+.ui-pad-note { font-size: 3px; fill: var(--ink-3); pointer-events: none; }
+.ui-pad-note.bad { fill: var(--bad); }
+.ui-pad-result { fill: none; stroke: var(--ink); stroke-width: 1.4px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.ui-pad-preview { fill: none; stroke: var(--accent); stroke-width: 1.4px; stroke-dasharray: 4 3; pointer-events: none; opacity: 0.9; }
+.ui-pad-stroke { fill: none; stroke: var(--ink-2); stroke-width: 1.4px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.ui-pad-issue { fill: rgba(229, 72, 77, 0.12); stroke: var(--bad); stroke-width: 1.4px; pointer-events: none; }
+.ui-pad-glyph { pointer-events: none; opacity: 0.55; }
+.ui-pad-glyph path { fill: none; stroke: var(--ink-2); stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round; vector-effect: none; }
+
+/* points: a wide invisible hit target, a ring that shows when selected, and the dot */
+.ui-pad-pt { cursor: grab; }
+.ui-pad-pt .hit { fill: transparent; }
+.ui-pad-pt .ring { fill: var(--accent-soft); fill-opacity: 0.9; stroke: var(--accent); stroke-width: var(--pad-hair); opacity: 0; transition: opacity var(--dur-1) var(--ease); }
+.ui-pad-pt .dot { fill: var(--surface); stroke: var(--accent); stroke-width: var(--pad-hair); transition: fill var(--dur-1) var(--ease); pointer-events: none; }
+.ui-pad-pt:hover .dot, .ui-pad-pt.drag .dot { fill: var(--accent); }
+.ui-pad-pt:hover .ring { opacity: 0.5; }
+.ui-pad-pt.sel .ring { opacity: 1; }
+.ui-pad-pt.sel .dot { fill: var(--accent); stroke: var(--accent-ink); }
+.ui-pad-pt.mirror { pointer-events: none; }
+.ui-pad-pt.mirror .dot { stroke: none; fill: var(--accent); fill-opacity: 0.35; }
+
+/* controls on the pad */
+.ui-pad-bar { position: relative; padding: 6px 6px 0; z-index: 2; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 4px; }
+.ui-pad-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ui-pad-top.hidden { display: none; }
+.ui-pad-tools { display: flex; gap: 3px; margin-left: auto; }
+.ui-pad-btn { width: var(--pad-btn); height: var(--pad-btn); display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: color-mix(in srgb, var(--surface) 90%, transparent); color: var(--ink-2); font-size: 13px; line-height: 1; cursor: pointer; transition: color var(--dur-1), border-color var(--dur-1), opacity var(--dur-1); }
+.ui-pad-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent-ring); }
+.ui-pad-btn:disabled { opacity: 0.35; cursor: default; }
+.ui-pad-stepper { display: inline-flex; align-items: center; gap: 2px; height: var(--pad-btn); padding: 0 3px 0 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: color-mix(in srgb, var(--surface) 90%, transparent); font-size: var(--t-xs); color: var(--ink-2); }
+.ui-pad-label { margin-right: 4px; color: var(--ink-3); }
+.ui-pad-stepper .ui-pad-slider { width: 44px; }
+.ui-pad-count { min-width: 14px; text-align: center; font-size: var(--t-sm); color: var(--ink); font-variant-numeric: tabular-nums; }
+.ui-pad-step { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--ink-2); font-size: var(--t-md); line-height: 1; cursor: pointer; }
+.ui-pad-step:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-ink); }
+.ui-pad-step:disabled { opacity: 0.3; cursor: default; }
+.ui-pad-slider { width: 52px; }
+.ui-pad-hud { position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 2; pointer-events: none; }
+.ui-pad-row { display: flex; align-items: center; gap: var(--s-2); padding: 4px 8px; border-radius: var(--r-sm); border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 92%, transparent); font-size: var(--t-xs); color: var(--ink-2); pointer-events: auto; }
+.ui-pad-row.hidden { display: none; }
+.ui-pad-row .ui-range { flex: 1; min-width: 40px; }
+.ui-pad-link { background: none; border: 0; padding: 0 2px; color: var(--ink-3); font-size: var(--t-xs); cursor: pointer; }
+.ui-pad-link:hover { color: var(--accent-ink); }
+.ui-pad-row .ui-btn.primary { padding: 2px 10px; font-size: var(--t-xs); }
+
+/* when a pad is docked into the canvas it fills its cell */
+.dock-cell > .ui-pad-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.dock-cell .ui-pad { flex: 1; min-height: 0; }
+.dock-cell .ui-pad-svg { flex: 1; min-height: 0; height: auto; aspect-ratio: auto; max-height: none; }
+.dock-cell .outline-stage { flex: 1; min-height: 0; display: flex; }
+.dock-cell .outline-stage > .ui-pad { flex: 1; min-width: 0; }
+.dock-cell .outline-tools { padding-right: 36px; }
+
+/* drag handle along the bottom edge: make a canvas taller or shorter */
+.ui-pad-grip { position: relative; height: 12px; flex: none; cursor: ns-resize; touch-action: none; z-index: 3; }
+.ui-pad-grip::after { content: ''; position: absolute; left: 50%; top: 4px; width: 30px; height: 3px; margin-left: -15px; border-radius: 2px; background: var(--line-strong); transition: background var(--dur-1), width var(--dur-1), margin-left var(--dur-1); }
+.ui-pad-grip:hover::after, .ui-pad-grip.drag::after { background: var(--accent); width: 44px; margin-left: -22px; }
+.dock-cell .ui-pad-grip { display: none; }
+
+/* quiet options along the bottom: small, muted, inside the container */
+.ui-pad-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: 2px 10px 0; min-height: 22px; font-size: var(--t-xs); color: var(--ink-3); }
+.ui-pad-foot .mini-toggle { gap: 5px; color: var(--ink-3); cursor: pointer; }
+.ui-pad-foot .mini-toggle:hover, .ui-pad-foot .ui-pad-link:hover { color: var(--accent-ink); }
+.ui-pad-foot .ui-pad-link { margin-left: auto; padding: 0; }

@@ -29,12 +29,14 @@ export function checkWall(outer: BufferGeometry, innerBvh: MeshBVH, target: numb
     if (t < min) min = t;
   }
   const measurable = Number.isFinite(min);
+  let at: { x: number; y: number; z: number } | undefined;
+  if (measurable) { let k = 0; for (let i = 0; i < n; i++) if (thickness[i] < thickness[k]) k = i; at = { x: pos.getX(k), y: pos.getY(k), z: pos.getZ(k) }; }
   const ok = measurable && min >= target * 0.8;
   return {
     thickness, min,
     check: {
       id: 'wall', ok, label: 'Wall',
-      detail: measurable ? `Min wall ${min.toFixed(2)} mm (target ${target.toFixed(2)} mm)` : 'Wall could not be measured (inner shell not found)',
+      detail: !measurable ? 'Could not measure the wall' : ok ? `Thinnest wall is ${min.toFixed(1)} mm (needs ${(target * 0.8).toFixed(1)} mm or more)` : `Thinnest wall is ${min.toFixed(1)} mm (needs ${(target * 0.8).toFixed(1)} mm or more)`,
     },
   };
 }

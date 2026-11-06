@@ -6,20 +6,23 @@ import { Profile } from '../geometry/profile';
 import { castSurface, Placement } from '../geometry/features';
 import { Params } from '../params/schema';
 
-export type CheckResult = { id: 'fit' | 'wall' | 'nook'; ok: boolean; label: string; detail: string };
+export type Pt = { x: number; y: number; z: number };
+/** A check result. When it fails, `fix` is a one-line next step and `at` (or `angleDeg` on the outline pad) says where to look. */
+export type CheckResult = { id: 'fit' | 'wall' | 'nook' | 'magnet' | 'draft' | 'radius'; ok: boolean; label: string; detail: string; fix?: string; at?: Pt; angleDeg?: number };
 
 export function checkFit(profile: Profile, p: Params, bvh: MeshBVH, geo: BufferGeometry, place: Placement): CheckResult {
   const need = seatRadius() + p.wall;
   const min = profile.minRadius(720);
   const deg = (min.phi * 180) / Math.PI;
   if (min.r < need) {
-    return { id: 'fit', ok: false, label: 'Puck fit', detail: `Puck needs ${(need - min.r).toFixed(1)} mm more room toward ${Math.round(((deg % 360) + 360) % 360)}°` };
+    const a = ((deg % 360) + 360) % 360, c = place.puck?.point;
+    return { id: 'fit', ok: false, label: 'Core fit', detail: `Too tight near ${Math.round(a)}°: the core needs ${(need - min.r).toFixed(1)} mm more room`, fix: `Widen the outline near ${Math.round(a)}° by ${(need - min.r + 0.1).toFixed(1)} mm`, angleDeg: deg, at: c ? { x: min.r * Math.cos(min.phi), y: c.y + min.r * Math.sin(min.phi), z: c.z } : undefined };
   }
-  if (!place.puck || place.backZ === null) return { id: 'fit', ok: false, label: 'Puck fit', detail: 'Cannot measure the body at the puck center' };
+  if (!place.puck || place.backZ === null) return { id: 'fit', ok: false, label: 'Core fit', detail: 'Could not measure the body at the core' };
   const depth = place.puck.point.z - place.backZ;
   const needDepth = CORE.puckDepth + floorThickness() + p.wall;
   if (depth < needDepth) {
-    return { id: 'fit', ok: false, label: 'Puck fit', detail: `Depth behind the puck is ${depth.toFixed(1)} mm, needs ${needDepth.toFixed(1)} mm` };
+    return { id: 'fit', ok: false, label: 'Core fit', detail: `Too shallow behind the core (${depth.toFixed(1)} mm, needs ${needDepth.toFixed(1)} mm)`, fix: `Add ${(needDepth - depth + 0.1).toFixed(1)} mm of depth`, at: place.puck.point };
   }
   // seat rim must stay on the surface: sample the rim ring and compare the surface height to the seat floor
   const zFloor = place.puck.point.z - CORE.puckDepth;
@@ -34,7 +37,7 @@ export function checkFit(profile: Profile, p: Params, bvh: MeshBVH, geo: BufferG
     if (margin < worst) { worst = margin; worstDeg = (a * 180) / Math.PI; }
   }
   if (worst < 0) {
-    return { id: 'fit', ok: false, label: 'Puck fit', detail: `Seat breaks through the surface near ${Math.round(worstDeg)}°: flatten the front or add depth` };
+    return { id: 'fit', ok: false, label: 'Core fit', detail: `The seat breaks through the surface near ${Math.round(worstDeg)}°. Flatten the front or add depth`, fix: 'Add depth or shrink the seat', angleDeg: worstDeg, at: place.puck.point };
   }
-  return { id: 'fit', ok: true, label: 'Puck fit', detail: `Clear by ${(min.r - need).toFixed(1)} mm, depth ${depth.toFixed(1)} mm` };
+  return { id: 'fit', ok: true, label: 'Core fit', detail: `At its tightest, ${(min.r - CORE.puckDiameter / 2).toFixed(1)} mm of body surrounds the core (needs ${(need - CORE.puckDiameter / 2).toFixed(1)} mm)` };
 }

@@ -1,1 +1,2 @@
-export const DENSITY_G_CM3: Record<string, number> = { PC: 1.2, ABS: 1.04, Silicone: 1.1, Zinc: 6.6 };
+import { MATERIALS } from '../../design/finishes';
+export const DENSITY_G_CM3: Record<string, number> = Object.fromEntries(MATERIALS.map((m) => [m.id, m.densityGcm3]));

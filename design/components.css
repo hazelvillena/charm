@@ -1,0 +1,150 @@
+/* Clayground components. Class prefix: ui-. Uses tokens only. */
+.ui-root { font: var(--t-md)/1.45 var(--font-sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+.ui-root button { font: inherit; color: inherit; cursor: pointer; }
+
+/* eyebrow / labels */
+.ui-eyebrow { font-size: var(--t-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.ui-num { font-variant-numeric: tabular-nums; } /* numbers use tabular figures of the sans face; there is no monospace typeface */
+
+/* card (collapsible section) */
+.ui-card, .ui-group { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); padding: 0; margin-bottom: var(--s-3); box-shadow: var(--sh-container); }
+.ui-group { padding: var(--s-4); } /* each section is its own container */
+.ui-card > summary { list-style: none; display: flex; align-items: center; gap: var(--s-2); cursor: pointer; user-select: none; padding: var(--s-3) var(--s-4); font-weight: 600; }
+.ui-card > summary::-webkit-details-marker { display: none; }
+.ui-card > summary::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3); transform: rotate(45deg); transition: transform var(--dur-2) var(--ease); }
+.ui-card[open] > summary::after { transform: rotate(-135deg); }
+.ui-card-body { display: grid; gap: var(--s-4); }
+.ui-card > .ui-card-body { padding: 0 var(--s-4) var(--s-4); } /* one inset for everything inside a container */
+.ui-card-body .ui-card-body, .ui-group > .ui-card-body { padding: 0; }
+/* small muted label (plain text, never a chip) */
+.ui-tag { font-size: var(--t-xs); color: var(--ink-3); font-weight: 500; }
+
+/* slider field */
+.ui-field { display: grid; gap: 6px; }
+.ui-field-top { display: flex; justify-content: space-between; align-items: baseline; }
+.ui-field label { color: var(--ink-2); }
+.ui-field .ui-val { font-size: var(--t-sm); font-variant-numeric: tabular-nums; color: var(--ink); }
+.ui-range { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; margin: 0; background: transparent; cursor: pointer; --p: 50%; }
+.ui-range:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; border-radius: var(--r-xs); }
+.ui-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+/* knob: a slim vertical rounded rectangle */
+.ui-range::-webkit-slider-thumb { -webkit-appearance: none; width: 6px; height: 16px; border-radius: 3px; margin-top: -6px; background: var(--surface); border: 1.5px solid var(--accent); box-shadow: var(--sh-1); transition: transform var(--dur-1) var(--ease); }
+.ui-range:hover::-webkit-slider-thumb, .ui-range:active::-webkit-slider-thumb { transform: scaleY(1.12); background: var(--accent-soft); }
+.ui-range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.ui-range::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+.ui-range::-moz-range-thumb { width: 3px; height: 13px; border-radius: 3px; background: var(--surface); border: 1.5px solid var(--accent); }
+
+/* segmented control */
+.ui-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px; gap: 2px; width: 100%; }
+.ui-seg.ui-fit { width: auto; }
+.ui-seg button { flex: 1; border: 0; background: transparent; padding: 4px 8px; border-radius: 6px; color: var(--ink-2); transition: background var(--dur-1), color var(--dur-1); white-space: nowrap; }
+.ui-seg button:hover { color: var(--ink); }
+.ui-seg button.on { background: var(--surface); color: var(--accent-ink); font-weight: 600; box-shadow: var(--sh-1); }
+
+/* buttons */
+.ui-btn { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-sm); padding: 6px 12px; white-space: nowrap; transition: border-color var(--dur-1), background var(--dur-1), transform var(--dur-1); }
+.ui-btn:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-2); }
+.ui-btn:active:not(:disabled) { transform: translateY(1px); }
+.ui-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ui-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.ui-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ui-btn.primary:hover:not(:disabled) { background: var(--accent-ink); border-color: var(--accent-ink); }
+.ui-btn.primary.warn { background: var(--surface); color: var(--bad); border-color: var(--bad); }
+.ui-btn.block { width: 100%; padding: 9px 12px; }
+.ui-btn.quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
+
+/* chip (preset) */
+.ui-chip { border: 0; background: transparent; padding: 5px 12px; border-radius: var(--r-pill); color: var(--ink-2); transition: background var(--dur-2) var(--ease), color var(--dur-2); }
+.ui-chip:hover { color: var(--ink); }
+.ui-chip.on { background: var(--accent); color: #fff; }
+
+/* stat */
+.ui-stat { display: grid; gap: 0; }
+.ui-stat b { font-size: var(--t-num); line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.ui-stat small { color: var(--ink-3); font-size: var(--t-xs); }
+.ui-stat b em { font-style: normal; font-size: var(--t-sm); font-weight: 500; color: var(--ink-3); margin-left: 2px; }
+
+/* metric tile (instrument-style readout) */
+.ui-tiles, .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.ui-tile { background: var(--surface); padding: 9px 10px 8px; display: grid; gap: 3px; min-width: 0; }
+.ui-tile small { color: var(--ink-3); font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+.ui-tile b { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-tile b em { font-style: normal; font-size: var(--t-xs); font-weight: 500; color: var(--ink-3); margin-left: 3px; }
+
+/* key/value row */
+.ui-kv { display: flex; justify-content: space-between; gap: var(--s-3); color: var(--ink-2); }
+.ui-kv b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; font-size: var(--t-sm); text-align: right; }
+
+/* swatch */
+.ui-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); background: var(--c); transition: transform var(--dur-1) var(--ease); }
+.ui-swatch:hover { transform: scale(1.1); }
+.ui-swatch.on { box-shadow: 0 0 0 2px var(--accent); }
+
+/* spinner (organic: a morphing blob ring) */
+.ui-spinner { width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid var(--accent-soft); border-top-color: var(--accent); animation: ui-spin 0.8s linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+.ui-busy { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--s-2); background: color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter: blur(6px); border-radius: inherit; color: var(--ink-2); font-size: var(--t-sm); z-index: 3; animation: ui-fade var(--dur-2) var(--ease); }
+@keyframes ui-fade { from { opacity: 0; } }
+
+/* messages: plain typographic captions, never boxed chips. Status messages float as text with a soft halo for legibility. */
+.ui-toast { color: var(--ink); font-size: var(--t-md); line-height: 1.4; max-width: min(520px, 86vw); text-align: center; padding: 2px 0; text-shadow: 0 0 8px var(--canvas), 0 0 3px var(--canvas), 0 0 14px var(--surface); transition: opacity var(--dur-3); }
+.ui-toast::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: 1px; }
+.ui-toast.warn::before { background: var(--warn); }
+.ui-toast.error { color: var(--bad); }
+.ui-toast.error::before { background: var(--bad); }
+.ui-toast.out { opacity: 0; }
+
+/* floating bar (stage toolbars) */
+.ui-float { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); }
+
+/* switch primitive: small and short */
+.ui-switch-row { position: relative; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.ui-switch-label { color: var(--ink-2); }
+.ui-switch-input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ui-switch { width: 22px; height: 12px; border-radius: 999px; background: var(--line-strong); position: relative; transition: background var(--dur-2) var(--ease); flex: none; }
+.ui-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1); transition: transform var(--dur-2) var(--ease); }
+.ui-switch-input:checked + .ui-switch { background: var(--accent); }
+.ui-switch-input:checked + .ui-switch::after { transform: translateX(10px); }
+.ui-switch-input:focus-visible + .ui-switch { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+/* ---- motion: things roll out, they do not pop ---- */
+:root { interpolate-size: allow-keywords; }
+.ui-card::details-content { block-size: 0; overflow: clip; overflow-clip-margin: 8px; transition: block-size var(--dur-3) var(--ease), content-visibility var(--dur-3) allow-discrete; }
+.ui-card[open]::details-content { block-size: auto; }
+/* unroll: a button whose icon spins once, fast and smooth, while its options roll out beside it. Use for every
+   button that opens a few options (not for dropdowns). Build with unroll() in src/ui/dom.ts. */
+.ui-unroll { display: flex; align-items: center; gap: 6px; }
+/* the icon makes one full, clean turn each time it opens (clockwise) or closes (back the other way) */
+.ui-unroll-btn.spin-open .ui-icon { animation: ui-spin var(--dur-unroll) var(--ease-unroll); }
+.ui-unroll-btn.spin-close .ui-icon { animation: ui-spin-back var(--dur-unroll) var(--ease-unroll); }
+@keyframes ui-spin-back { to { transform: rotate(-360deg); } }
+.ui-unroll-body { display: grid; grid-template-columns: 0fr; opacity: 0; pointer-events: none; transition: grid-template-columns var(--dur-unroll) var(--ease-unroll), grid-template-rows var(--dur-unroll) var(--ease-unroll), opacity calc(var(--dur-unroll) * 0.55) var(--ease), transform var(--dur-unroll) var(--ease-unroll); }
+.ui-unroll.open > .ui-unroll-body { grid-template-columns: 1fr; opacity: 1; pointer-events: auto; }
+.ui-unroll-inner { overflow: hidden; min-width: 0; white-space: nowrap; }
+.ui-unroll-card { display: flex; align-items: center; gap: 6px; }
+/* unrolling downward: the options hang below the button and roll down over the content beneath (nothing is pushed) */
+.ui-unroll.toward-down { position: relative; }
+.ui-unroll.toward-down > .ui-unroll-body { position: absolute; top: calc(100% + 8px); left: 0; z-index: 8; width: max-content; grid-template-columns: auto; grid-template-rows: 0fr; transform: translateY(-8px); }
+.ui-unroll.toward-down.open > .ui-unroll-body { grid-template-rows: 1fr; transform: none; }
+.ui-unroll.toward-down .ui-unroll-card { flex-direction: column; align-items: stretch; gap: 0; }
+.ui-unroll.toward-down .ui-seg { flex-direction: column; width: max-content; min-width: 150px; background: var(--surface); box-shadow: var(--sh-container); }
+.ui-unroll.toward-down .ui-seg button { text-align: left; padding: 7px 10px; }
+/* a toggle button whose icon spins once when it flips, and keeps turning slowly while it is on */
+.ui-spin-once .ui-icon { animation: ui-spin var(--dur-unroll) var(--ease-unroll); }
+.ui-spin-live.on .ui-icon { animation: ui-spin 9s linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+/* popovers fade and rise */
+.ui-pop { transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), visibility var(--dur-2); }
+.ui-pop.closed { opacity: 0; transform: translateY(-8px) scale(0.98); visibility: hidden; pointer-events: none; }
+/* reduced motion: no spinning or sliding, but panels still open smoothly so state changes stay readable */
+@media (prefers-reduced-motion: reduce) { .ui-unroll-btn.spin-open .ui-icon, .ui-unroll-btn.spin-close .ui-icon { animation: none; } .ui-unroll-body { transform: none !important; transition: grid-template-columns 300ms ease, grid-template-rows 300ms ease, opacity 200ms ease; } .ui-spin-once .ui-icon, .ui-spin-live.on .ui-icon { animation: none; } }
+
+/* sliders: they snap to their step (faint notches) and the value can be typed */
+.ui-range.ticked::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(255, 255, 255, 0.7) 1px, transparent 1px) 0 0 / calc(100% / var(--n)) 100% repeat-x, linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+.ui-val { display: inline-flex; align-items: baseline; gap: 2px; }
+.ui-num-input { width: 3ch; padding: 0 2px; margin: 0; border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--ink); font: inherit; font-size: var(--t-sm); font-variant-numeric: tabular-nums; text-align: right; border-radius: 3px; transition: color var(--dur-2) var(--ease), background var(--dur-2) var(--ease); }
+.ui-num-input:hover { border-bottom-color: var(--line-strong); }
+.ui-num-input:focus { outline: none; background: var(--accent-soft); border-bottom-color: var(--accent); }
+.ui-num-input.tick { animation: ui-tick var(--dur-2) var(--ease); }
+.ui-unit { color: var(--ink-3); font-size: var(--t-xs); }
+@keyframes ui-tick { 0% { color: var(--accent-ink); } 100% { color: var(--ink); } }

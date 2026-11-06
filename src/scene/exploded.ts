@@ -1,4 +1,4 @@
-import { Group, Mesh, BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, MeshPhysicalMaterial, SphereGeometry, Vector3, Quaternion, Material } from 'three';
+import { Group, Mesh, BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, MeshPhysicalMaterial, SphereGeometry, Vector3, Quaternion, Material, Line, LineDashedMaterial } from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Casing, MeshOut } from '../geometry/solids';
@@ -20,6 +20,12 @@ function geoFrom(m: MeshOut): BufferGeometry {
 const label = (text: string) => { const d = document.createElement('div'); d.className = 'label3d'; d.textContent = text; return new CSS2DObject(d); };
 
 /** Exploded/assembled view of the accepted casing with CSS2D labels. */
+function bbox(pos: Float32Array) {
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const v = pos[i + k]; if (v < min[k]) min[k] = v; if (v > max[k]) max[k] = v; }
+  return { min, max };
+}
+
 export class ExplodedView {
   readonly group = new Group();
   private parts: { obj: Group; base: number; off: number }[] = [];
@@ -54,15 +60,19 @@ export class ExplodedView {
     add('front', front);
 
     const mags = new Group();
-    casing.magnets.forEach((mg) => { const m = makeMagnet(); m.position.set(mg.x, mg.y, mg.z + CORE.magnet.thickness / 2 + 0.2); mags.add(m); this.geos.push(m.geometry); });
-    const ml = label('Magnets'); ml.position.set(CORE.magnet.spacing / 2 + CORE.magnet.diameter / 2 + 5, casing.seat.y - 2, casing.seat.zFloor); mags.add(ml);
+    casing.magnets.forEach((mg, i) => { const m = makeMagnet(i % 2 === 0 ? 'N' : 'S'); m.position.set(mg.x, mg.y, mg.z); mags.add(m); });
+    const ml = label('Magnets'); ml.position.set(CORE.magnet.diameter / 2 + 5, casing.seat.y - 2, casing.magnets[0]?.z ?? casing.seat.zFloor); mags.add(ml);
     add('magnets', mags);
 
     const puck = new Group(); const pk = makePuck();
-    pk.position.set(casing.seat.x, casing.seat.y, casing.seat.zFloor + CORE.puckDepth / 2 + 0.3);
+    pk.position.set(casing.seat.x, casing.seat.y, casing.seat.zFloor + CORE.puckDepth / 2);
     puck.add(pk);
-    const pl = label('AI core'); pl.position.set(casing.seat.radius + 4, casing.seat.y + casing.seat.radius * 0.8, casing.seat.zFloor + CORE.puckDepth); puck.add(pl);
+    const pl = label('Core'); pl.position.set(casing.seat.radius + 4, casing.seat.y + casing.seat.radius * 0.8, casing.seat.zFloor + CORE.puckDepth); puck.add(pl);
     add('puck', puck);
+    // dashed assembly axis through the Core, like a technical exploded diagram
+    const axis = new BufferGeometry(); axis.setAttribute('position', new Float32BufferAttribute([0, casing.seat.y, -110, 0, casing.seat.y, 110], 3));
+    const axisLine = new Line(axis, new LineDashedMaterial({ color: 0x8a8e99, dashSize: 3, gapSize: 2.2, transparent: true, opacity: 0.8 }));
+    axisLine.computeLineDistances(); this.group.add(axisLine); this.geos.push(axis);
     this.apply();
     void Quaternion;
   }

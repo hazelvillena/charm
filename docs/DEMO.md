@@ -12,14 +12,15 @@ Make a **backup screen recording** first (QuickTime: Cmd+Shift+5) running this e
 "Identity varies, the hardware interface does not." A parametric system that holds real hardware constraints while the form changes, then bridges design to engineering.
 
 ## Beats
+0. (Optional, 15 s) Material card: pick **PC/ABS, Silicone or Metal** (finishes follow the material), pick a color and a finish (Pearl, Translucent). Toggle **Split line** to show the mold split on the surface.
 1. **Open on the Ghost** (about 20 s). "This is the original Charmer, fitted from my own model." Tick **Show original Charmer** to overlay the reference in 2D and 3D, then untick. Say what the tool is: a concept casing and prefab preview, not class-A.
 2. **Preset tour** (20 s). Click Blob, Star, Cloud, Drop. Shapes animate; same locked puck. "Same hardware, different identity."
-3. **Draw the outline** (40 s). Drag a couple of outline points on the 2D editor: a longer leg, a pointier head. Point out the puck keep-out circle: drag toward it and the point stops. "The hardware constraint is built into the input."
+3. **Draw the outline** (40 s). Drag a couple of outline points, or switch to **Draw** and sketch a shape around the puck: it fits into the same points. Show the **Side profile** card: drag the back bulge. Point out the puck keep-out circle: drag toward it and the point stops. "The hardware constraint is built into the input."
 4. **Cage vs smooth** (20 s). Toggle Cage / Both. "Low-poly quad cage, Catmull-Clark SubD live in the browser, like Tab in Rhino."
-5. **Break it on purpose** (40 s). Drop **Depth** to the minimum. The Puck fit pill goes red with the exact reason ("Depth behind the puck is 10.0 mm, needs 12.8 mm") and the wall pill follows. Turn on **Wall heatmap** to show thin areas. Raise Depth back to green.
-6. **Accept** (40 s). Click Accept. Hollow front and back shells build in about half a second (manifold-3d). Exploded view: back shell, magnets, AI core, front shell, loop, with labels. Orbit the camera. Toggle Assemble / Explode.
-7. **Spec card** (30 s). Dimensions, volumes, weight for the material (about 15 to 17 g PC), measured wall vs target, split line, core dims (labeled TBD placeholders), check results.
-8. **Export and Rhino** (30 s). Export > Cage OBJ (quads). "Designed to open in Rhino as SubD, then ToNURBS and STEP for engineering. I haven't verified that round trip yet." Also STL shells, spec JSON, and **Share link** (restores this exact identity).
+5. **Break it on purpose** (40 s). Drop **Depth** to the minimum. **Core fit** goes red with the exact reason. Show **Ghost** and **Section** (the wall, core and sealed magnets), then **Analyze > Mold draft** and **Zebra stripes**. Raise Depth back to green.
+6. **Library** (30 s). Save two or three iterations (grid icon), then change the **Core** diameter or the material: every saved iteration updates. **Build casing** in the right column: the exploded diagram has numbered leader tags. Hollow front and back shells build in about half a second (manifold-3d). Exploded view: back shell, magnets, AI core, front shell, loop, with labels. Orbit the camera. Toggle Assemble / Explode.
+7. **Outputs** (30 s). Live size, weight (about 15 to 17 g PC), measured wall vs target, split line, core dims (TBD placeholders), check results. All of it also updated live while you edited.
+8. **Export and Rhino** (30 s). **Export** (bottom of the right panel) > Cage OBJ (quads). Also STEP (faceted solid for Creo/Rhino; not NURBS). "Designed to open in Rhino as SubD, then ToNURBS and STEP for engineering. I haven't verified that round trip yet." Also STL shells, spec JSON, and **Share link** (restores this exact identity).
 
 ## If something goes wrong
 - A bad edit never breaks the app: it keeps the last valid shape and shows a toast.

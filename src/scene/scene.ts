@@ -2,7 +2,8 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, PMREMGenerator, Group, Mesh, BufferGeometry, Float32BufferAttribute,
   Uint32BufferAttribute, MeshPhysicalMaterial, MeshBasicMaterial, LineSegments, LineBasicMaterial, Points, PointsMaterial,
   CylinderGeometry, TorusGeometry, SphereGeometry, Vector3, Quaternion, DirectionalLight, HemisphereLight, CanvasTexture,
-  PlaneGeometry, NeutralToneMapping, DoubleSide, Object3D, Material,
+  PlaneGeometry, NeutralToneMapping, DoubleSide, FrontSide, Object3D, Material, Plane, ShaderMaterial,
+  MeshLambertMaterial, Sprite, SpriteMaterial,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -11,11 +12,16 @@ import { triangulate } from '../geometry/mesh';
 import { Placement, loopRing } from '../geometry/features';
 import { CORE } from '../params/core';
 import { Params } from '../params/schema';
-import { COLORS } from '../store';
+import { Look, finishById, DEFAULT_LOOK } from '../../design/finishes';
+import { applyFinish, installSplitBand, splitUniforms } from './materials';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { makePuck } from './parts';
+import { makePuck, makeMagnet } from './parts';
+import type { ViewMode, Analysis } from '../store';
+import { SectionView } from './section';
+import type { SectionData } from '../geometry/solids';
 
 export const BG = '#F6F6F4';
+const maxIndex = (a: Uint32Array) => { let m = 0; for (let i = 0; i < a.length; i++) if (a[i] > m) m = a[i]; return m; }; // no spread: arrays can be 150k long
 
 type LevelGeo = { geo: BufferGeometry; bvh: MeshBVH | null; dirty: boolean; level: number };
 
@@ -37,9 +43,23 @@ export class SceneView {
   private puck: Group;
   private loopMesh: Mesh;
   private loopMat: MeshPhysicalMaterial;
+  private innerMesh: Mesh;
+  private innerMat: MeshPhysicalMaterial;
+  private magnets = new Group();
+  private sectionOuter: LineSegments; private sectionInner: LineSegments;
+  private clipPlane = new Plane(new Vector3(-1, 0, 0), 0); // keeps x <= 0, so the cut face looks toward +x
+  private zebraMat: ShaderMaterial;
+  private analysisMat = new MeshLambertMaterial({ vertexColors: true }); // matte, so the analysis colors read true (no clearcoat or tint over them)
+  private hasColors = false;
+  private viewMode: ViewMode = 'shaded';
+  private analysis: Analysis = 'none';
+  private clip: Plane[] = [];
+  private sectionView = new SectionView();
+  private sectionReady = false;
+  private puckWanted = false; private loopWanted = false;
   private shadow: Mesh;
   private ghost: Mesh | null = null;
-  private baseColor = new Color('#C9C3F2');
+  private baseColor = new Color(DEFAULT_LOOK.color);
   private tint = 0;
   private active = 2;
   private target = new Vector3(0, 30, 0);
@@ -61,7 +81,7 @@ export class SceneView {
     const dl = new DirectionalLight(0xffffff, 1.1); dl.position.set(60, 120, 140); this.scene.add(dl);
 
     this.camera = new PerspectiveCamera(30, 1, 5, 2000);
-    this.camera.position.set(75, 70, 190);
+    this.camera.position.set(110, 62, 172);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
     this.controls.target.copy(this.target); this.controls.minDistance = 60; this.controls.maxDistance = 500;
@@ -70,9 +90,10 @@ export class SceneView {
     this.stageGroup.visible = false;
 
     this.shellMat = new MeshPhysicalMaterial({ color: this.baseColor, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.12, metalness: 0 });
+    installSplitBand(this.shellMat);
     for (const [lv, f] of Object.entries(faces)) {
       const g = new BufferGeometry();
-      const verts = Math.max(...Array.from(f)) + 1;
+      const verts = maxIndex(f) + 1;
       g.setAttribute('position', new Float32BufferAttribute(new Float32Array(verts * 3), 3));
       g.setAttribute('normal', new Float32BufferAttribute(new Float32Array(verts * 3), 3));
       g.setIndex(new Uint32BufferAttribute(triangulate(f), 1));
@@ -105,6 +126,26 @@ export class SceneView {
     this.loopMat = this.shellMat.clone();
     this.loopMesh = new Mesh(new TorusGeometry(lr.major, lr.tube, 18, 40), this.loopMat);
     this.loopMesh.visible = false; this.root.add(this.loopMesh);
+
+    // inner shell (ghost + section views), magnets, section lines, zebra material
+    const f2 = faces[2]; const v2 = maxIndex(f2) + 1;
+    const ig = new BufferGeometry();
+    ig.setAttribute('position', new Float32BufferAttribute(new Float32Array(v2 * 3), 3));
+    ig.setAttribute('normal', new Float32BufferAttribute(new Float32Array(v2 * 3), 3));
+    ig.setIndex(new Uint32BufferAttribute(triangulate(f2), 1));
+    this.innerMat = new MeshPhysicalMaterial({ color: 0xc4cbff, roughness: 0.55, metalness: 0, side: DoubleSide, transparent: true, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: 1 });
+    this.innerMesh = new Mesh(ig, this.innerMat); this.innerMesh.visible = false; this.innerMesh.frustumCulled = false; this.root.add(this.innerMesh);
+    for (let i = 0; i < 2; i++) { const m = makeMagnet(i === 0 ? 'N' : 'S'); this.magnets.add(m); }
+    this.magnets.visible = false; this.root.add(this.magnets);
+    this.sectionOuter = new LineSegments(new BufferGeometry(), new LineBasicMaterial({ color: 0x0f1117 }));
+    this.sectionInner = new LineSegments(new BufferGeometry(), new LineBasicMaterial({ color: 0x5b6cff }));
+    for (const l of [this.sectionOuter, this.sectionInner]) { l.visible = false; l.frustumCulled = false; this.root.add(l); }
+    this.root.add(this.sectionView.group);
+    this.zebraMat = new ShaderMaterial({
+      uniforms: { uFreq: { value: 26 } },
+      vertexShader: 'varying vec3 vN; varying vec3 vP; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vP = mv.xyz; gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'varying vec3 vN; varying vec3 vP; uniform float uFreq; void main(){ vec3 n = normalize(vN); vec3 r = reflect(normalize(vP), n); vec3 w = normalize(transpose(mat3(viewMatrix)) * r); float s = sin(w.y * uFreq + w.x * uFreq * 0.3); float band = smoothstep(-0.12, 0.12, s); gl_FragColor = vec4(mix(vec3(0.06, 0.06, 0.09), vec3(0.97), band), 1.0); }',
+    });
 
     // contact shadow
     const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -165,34 +206,108 @@ export class SceneView {
       m.quaternion.copy(q);
       m.scale.set(rx, ry, rz);
     });
+    this.puckWanted = !!pl.puck; this.loopWanted = !!pl.loop;
+    const hideForSection = this.viewMode === 'section' && this.sectionReady;
     if (pl.puck) {
-      this.puck.visible = true;
+      this.puck.visible = !hideForSection;
       const n = pl.puck.normal;
       this.puck.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), n);
-      this.puck.position.copy(pl.puck.point).addScaledVector(n, -(CORE.puckDepth / 2) + 0.6);
+      this.puck.position.copy(pl.puck.point).addScaledVector(n, -(CORE.puckDepth / 2)); // top plane flush with the surface, dome proud
     } else this.puck.visible = false;
+    if (pl.puck) {
+      const zFloor = pl.puck.point.z - CORE.puckDepth, zc = zFloor - CORE.magnet.gap - CORE.magnet.thickness / 2;
+      this.magnets.children.forEach((m, i) => m.position.set(0, pl.puck!.point.y + (i - 0.5) * CORE.magnet.spacing, zc));
+    }
     if (pl.loop) {
-      this.loopMesh.visible = true;
+      this.loopMesh.visible = !hideForSection;
       this.loopMesh.position.copy(pl.loop.center);
     } else this.loopMesh.visible = false;
   }
 
-  setViewMode(mode: 'smooth' | 'cage' | 'both') {
-    this.cageLines.visible = mode !== 'smooth'; this.cagePts.visible = mode !== 'smooth';
-    this.shellMat.transparent = mode !== 'smooth';
-    this.shellMat.opacity = mode === 'smooth' ? 1 : mode === 'both' ? 0.32 : 0.0;
-    this.shellMat.depthWrite = mode === 'smooth';
-    this.shellMat.needsUpdate = true;
-    this.loopMat.transparent = this.shellMat.transparent; this.loopMat.opacity = mode === 'smooth' ? 1 : 0.9; this.loopMat.needsUpdate = true;
+  /** rebuild the core mesh after its shape params changed */
+  rebuildCore() {
+    const vis = this.puck.visible, pos = this.puck.position.clone(), q = this.puck.quaternion.clone();
+    this.root.remove(this.puck);
+    this.puck.traverse((o) => { const m = o as Mesh; if (m.geometry) m.geometry.dispose(); });
+    this.puck = makePuck(); this.puck.visible = vis; this.puck.position.copy(pos); this.puck.quaternion.copy(q);
+    this.root.add(this.puck); this.applyClip();
   }
 
-  setColor(id: string) {
-    const c = COLORS.find((x) => x.id === id) ?? COLORS[0];
-    this.baseColor.set(c.hex);
-    this.shellMat.metalness = c.metal ? 1 : 0;
-    this.shellMat.roughness = c.metal ? 0.14 : 0.25;
+  /** shaded | ghost (see-through to the wall, core and magnets) | section (cut open) | cage */
+  setViewMode(mode: ViewMode) {
+    this.viewMode = mode;
+    const ghost = mode === 'ghost', section = mode === 'section', cage = mode === 'cage';
+    this.cageLines.visible = cage; this.cagePts.visible = cage;
+    this.innerMesh.visible = ghost || section; this.magnets.visible = ghost || section;
+    this.sectionOuter.visible = section; this.sectionInner.visible = section;
+    this.renderer.localClippingEnabled = section;
+    this.clip = section ? [this.clipPlane] : [];
+    this.applyClip();
+    this.shellMat.side = section ? DoubleSide : FrontSide;
+    this.applySectionVisibility();
+    const see = ghost || cage;
+    this.shellMat.transparent = see; this.shellMat.opacity = ghost ? 0.2 : cage ? 0.32 : 1; this.shellMat.depthWrite = !see;
+    this.shellMat.needsUpdate = true;
+    this.loopMat.transparent = see; this.loopMat.opacity = see ? 0.85 : 1; this.loopMat.needsUpdate = true;
+    this.innerMat.needsUpdate = true;
+    this.applyMeshMaterial();
+  }
+  /** the section plane applies to the shell, wall, core, magnets and eyes (not the ground shadow) */
+  private applyClip() {
+    for (const m of [this.shellMat, this.innerMat, this.loopMat, this.eyeMat]) m.clippingPlanes = this.clip;
+    for (const g of [this.puck, this.magnets]) g.traverse((o) => { const mat = (o as Mesh).material as Material | undefined; if (mat) mat.clippingPlanes = this.clip; });
+  }
+  /** the cut-open casing (real solids with poche) replaces the quick clipped preview once it is ready */
+  setSectionData(data: SectionData | null) {
+    if (data) {
+      const coreMat = new MeshPhysicalMaterial({ color: 0xeceae5, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.12, side: DoubleSide });
+      const magMat = new MeshPhysicalMaterial({ color: 0x9aa0aa, metalness: 1, roughness: 0.3, side: DoubleSide });
+      this.sectionView.set(data, this.shellMat, coreMat, magMat);
+    } else this.sectionView.clear();
+    this.sectionReady = !!data; this.applySectionVisibility();
+  }
+  get hasSection() { return this.sectionReady; }
+  private applySectionVisibility() {
+    const section = this.viewMode === 'section', ready = section && this.sectionReady;
+    this.sectionView.group.visible = ready;
+    this.smooth.visible = !ready; this.puck.visible = this.puckWanted && !ready;
+    this.innerMesh.visible = (this.viewMode === 'ghost' || section) && !ready;
+    this.magnets.visible = (this.viewMode === 'ghost' || section) && !ready;
+    this.loopMesh.visible = this.loopWanted && !ready;
+    this.sectionOuter.visible = section && !ready; this.sectionInner.visible = section && !ready;
+  }
+  get mode() { return this.viewMode; }
+
+  updateInner(positions: Float32Array) {
+    const pos = this.innerMesh.geometry.attributes.position as Float32BufferAttribute;
+    (pos.array as Float32Array).set(positions.subarray(0, pos.array.length)); pos.needsUpdate = true;
+    this.innerMesh.geometry.computeVertexNormals();
+  }
+  updateSection(outer: Float32Array, inner: Float32Array) {
+    this.sectionOuter.geometry.setAttribute('position', new Float32BufferAttribute(outer, 3));
+    this.sectionInner.geometry.setAttribute('position', new Float32BufferAttribute(inner, 3));
+  }
+
+  /** analysis overlays: vertex colors on the level-2 surface, or the zebra shader */
+  setAnalysis(mode: Analysis, colors: Float32Array | null) {
+    this.analysis = mode;
+    const lg = this.levels.get(2)!;
+    if (colors) { lg.geo.setAttribute('color', new Float32BufferAttribute(colors, 3)); this.smooth.geometry = lg.geo; this.active = 2; }
+    this.hasColors = !!colors;
+    this.applyMeshMaterial();
+  }
+  private applyMeshMaterial() { this.smooth.material = this.analysis === 'zebra' && this.viewMode === 'shaded' ? this.zebraMat : this.hasColors ? this.analysisMat : this.shellMat; }
+  get analysisMode() { return this.analysis; }
+  get isZebra() { return this.analysis === 'zebra'; }
+
+  setLook(look: Look) {
+    this.baseColor.set(look.color);
+    const f = finishById(look.finish);
+    applyFinish(this.shellMat, f, this.baseColor);
+    applyFinish(this.loopMat, f, this.baseColor);
     this.applyTint();
   }
+  setSplit(zMm: number, on: boolean, cy = 0) { splitUniforms.uSplitZ.value = zMm; splitUniforms.uSplitOn.value = on ? 1 : 0; splitUniforms.uSplitCy.value = cy; }
   get shellColor() { return this.baseColor; }
   setInvalidTint(t: number) { this.tint = t; this.applyTint(); }
   private applyTint() {
@@ -201,20 +316,37 @@ export class SceneView {
   }
 
   /** heatmap: pass per-vertex colors for the level-2 geometry, or null */
-  setHeatmap(colors: Float32Array | null) {
-    const lg = this.levels.get(2)!;
-    if (colors) {
-      lg.geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
-      this.shellMat.vertexColors = true; this.smooth.geometry = lg.geo; this.active = 2;
-    } else this.shellMat.vertexColors = false;
-    this.shellMat.needsUpdate = true;
-  }
+  setHeatmap(colors: Float32Array | null) { this.setAnalysis(this.analysis, colors); }
   get activeLevel() { return this.active; }
   showLevel(level: number) { this.active = level; this.smooth.geometry = this.levels.get(level)!.geo; }
 
   setShadow(width: number) { this.shadow.scale.set(width * 2.2, width * 2.2, 1); }
   setTarget(y: number) { this.controls.target.y += (y - this.controls.target.y) * 0.2; }
   frame(height: number) { this.target.set(0, height * 0.46, 0); this.controls.target.copy(this.target); }
+
+  /** ring markers on the model where a check needs attention (always on top, so they read through the surface) */
+  private issues = new Group(); private issueTex: CanvasTexture | null = null;
+  setIssues(points: Vector3[]) {
+    if (!this.issues.parent) this.root.add(this.issues);
+    this.issues.clear();
+    if (!this.issueTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 96; const g = c.getContext('2d')!;
+      g.lineWidth = 7; g.strokeStyle = '#e5484d'; g.beginPath(); g.arc(48, 48, 36, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = 'rgba(229,72,77,0.18)'; g.fill();
+      this.issueTex = new CanvasTexture(c);
+    }
+    for (const p of points) { const sp = new Sprite(new SpriteMaterial({ map: this.issueTex, depthTest: false, transparent: true })); sp.position.copy(p); sp.scale.setScalar(11); sp.renderOrder = 20; this.issues.add(sp); }
+  }
+  /** turn the camera to look at a point from the outside */
+  focusAt(p: Vector3) {
+    const dir = p.clone().sub(this.target); if (dir.lengthSq() < 1) dir.set(0, 0, 1);
+    dir.normalize(); const up = new Vector3(0, 0.25, 0);
+    this.flyTo(p.clone().addScaledVector(dir.add(up).normalize(), 90), p, 600);
+  }
+
+  /** a slow turntable: the camera orbits the model about once a minute until switched off */
+  setTurntable(on: boolean) { this.controls.autoRotate = on; this.controls.autoRotateSpeed = 1.0; }
+  get turntable() { return this.controls.autoRotate; }
 
   flyTo(pos: Vector3, target: Vector3, ms = 800) {
     const p0 = this.camera.position.clone(), t0 = this.controls.target.clone(), start = performance.now();

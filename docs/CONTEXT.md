@@ -1,7 +1,7 @@
-# Charmer Lab: Living Context
+# Clayground: Living Context
 
 **Read this first when picking the project up.** Keep it short and current. Update it in the same commit as any change that alters what is true here.
-Last updated: 2026-11-05 (v0 built).
+Last updated: 2026-11-05 (v0.2: analysis, library, core).
 
 ## What this is
 A browser tool to shape a Charmer (interchangeable character shell around a fixed AI puck): drag a mirrored 2D outline, it inflates into a SubD body, live checks hold the hardware constraints, Accept builds hollow front/back shells with an exploded view and spec card, then export cage OBJ / STL / spec JSON.
@@ -18,6 +18,16 @@ Demo: **Nov 6, 2026**, screen share, technical design interview.
 See the checklist in PLAN.md section 12 and the Log below. **v0 is built end to end** (outline editor, SubD, checks, Accept, exploded view, spec card, export, share link). Remaining: backup recording, Rhino round-trip test, real core dims. See PLAN.md section 12.
 
 ## Key facts to not rediscover
+- **Library = source of truth** (ADR 0020): starred items are the pill at the top; presets are library items; Save appears after edits; the two drawing pads can expand into the left half of the canvas.
+- Copy is deliberately terse; checks use plain designer language; "Manufacturing" is called **Shell**.
+- **Body = Poisson (membrane) inflation** of the outline (`src/geometry/inflate.ts`, ADR 0019); inner shell = clamped normal offset (uniform wall). Geometry library overview: [src/geometry/README.md](../src/geometry/README.md).
+- Messages are plain text (notes inline, status captions above the toolbar); never boxed chips.
+- **Core** (was AI puck): global, domed with rounded edge, magnets behind a 1 mm floor (ADR 0012). Global params = Core, wall, material, split; everything else is per-iteration (ADR 0015).
+- Materials drive finishes and weight (ADR 0013). Views: Shaded/Ghost/Section/Cage; Analyze menu: draft, curvature, zebra, wall (ADR 0014).
+- Outline: 4 to 12 points per side + smoothness; cage N = 10 (ADR 0016). Draw has a review step with fidelity/smoothing.
+- Product name: **Clayground**. UI/material styling lives in `design/` only (ADR 0009).
+- Shape = outline (polar, mirrored) + **side profile** (ADR 0010). Ghost values are fitted from the reference; the puck plateau is flat by design.
+- Layout: inputs left, live outputs right; below 1180 px outputs is a drawer, below 700 px both are drawers (no clipped controls).
 - Units mm, front +Z, up +Y, body stands on y = 0. Puck center C is the polar origin.
 - Core dims are placeholders (puck 1 inch). `REFERENCE_SCALE = 1.78`.
 - Presets: Ghost (fitted from reference via `node scripts/fitReference.mjs`, regenerates `src/params/presets.generated.ts`), Blob, Star, Cloud, Drop.
@@ -32,3 +42,18 @@ See the checklist in PLAN.md section 12 and the Log below. **v0 is built end to 
 ## Log
 - 2026-11-05: Plan written; core geometry (quad sphere, profile, Catmull-Clark, shape map), presets, fit script, tests (incl. 1000-case sweep) done. ADRs 0001 to 0008 recorded.
 - 2026-11-05: v0 built and verified (tests, production build, browser). DEMO.md written. See PLAN.md Log for bugs found and fixed.
+- 2026-11-05: v0.1: renamed to Clayground; design/ folder (ADR 0009); side profile + fit (ADR 0010); freehand draw (ADR 0011); inputs/outputs layout with live outputs; finishes + color picker + split-line shader; responsive drawers. Fixed: Accept hidden off-screen on narrow panes; split line now visible in Explore.
+- 2026-11-05: v0.2: Ghost/Section views, Analyze menu, designer checks (magnet gap, mold draft, tightest radius), materials-drive-finishes (fixes the dead material toggle), Core params + dome + magnets behind a thin floor, variable outline points + smoothness, draw review, library with live global updates, named iterations, metric tiles, leader-line diagram tags, side profile flipped (front left). ADRs 0012 to 0016.
+- 2026-11-05: v0.3: fixed the valley crease (constant-width edge roll-off, ADR 0017); drawings stay curved and reset the side profile; Section is now real solids with ink poche (core seat walls, floor, magnet pockets), magnets stacked vertically on the centre line; Analyze is a floating layers icon on the canvas; Export is a dropdown with a format picker; permalink button top right; no monospace typeface anywhere; default look is frost blue-gray.
+- 2026-11-05: v0.4: STEP export (faceted B-rep, verified through OpenCascade, ADR 0018); Export moved to the bottom of the outputs panel; both side panels collapse at every width; dashed hairline parting line; gray core halo; smooth result silhouette overlay in the outline editor; optional flat core seat toggle.
+- 2026-11-05: v0.5: Poisson inflation replaces the radial pillow (fixes the Triangle's corner creases), inner shell as a normal offset, TIP_SHARPEN 0.1, Triangle replaces Cloud (true rounded triangle), library seeded with 8 smooth starter shapes that pass every check, panels dock and push the canvas (one icon per panel), simple boxed exploded labels restored, messages as plain text, library thumbnails framed by width. ADR 0019.
+- 2026-11-05: v0.6: library-driven pill with star/unstar, Save control, expandable sketch dock, side pad follows the body, aligned top row, compact copy, plain-language checks, minimal export list, trimmed outputs, eyes kept clear of the core. ADR 0020.
+
+## 2026-11-05 · Clayground pass
+Renamed to Clayground. One top bar; zoomable pads with on-canvas controls; free side-profile points (ADR 0021); core drag; checks with a one-line fix and a marker; library items carry their own material and show the Core; loop off by default; hatched-poche section; STEP export kept as a format row (needs a built casing). 86 tests pass.
+
+## 2026-11-06 · Pad component and complete exports
+Charmer rename; shared Pad component (ADR 0022); side profile points editable (4–10); plain sanity check with an i per row; STEP/STL/OBJ carry shells, Core, magnets and eyes; turntable; Clover is a default favourite. 89 tests pass.
+
+## 2026-11-06 · Polish pass
+Self-hosted Instrument Sans; Lucide icons; unroll component (spin once, options roll out, toolbar pinned so the eye never moves); undo/redo; eyes two/one/none; canvases resizable with Original and Reset along the bottom; side pad draws the true side silhouette and the side curve is a natural spline; Core top is one smooth dome; section prepared before the view switches; poche tokens (design/poche.ts). 91 tests pass.

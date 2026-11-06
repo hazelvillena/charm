@@ -1,4 +1,4 @@
-# Charmer Lab (docs)
+# Clayground (docs)
 
 Start with [CONTEXT.md](CONTEXT.md). Project overview and run commands: [../README.md](../README.md).
 

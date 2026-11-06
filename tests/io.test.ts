@@ -67,3 +67,22 @@ describe('architecture rule: reusable layers have no DOM or scene code', () => {
     }
   });
 });
+
+describe('OBJ parts (eyes and Core)', () => {
+  it('writes eyes and the Core as separate closed, outward-facing objects', async () => {
+    const { partsObj, parseObj } = await import('../src/io/exportObj');
+    const { Vector3 } = await import('three');
+    const n = new Vector3(0, 0, 1);
+    const place: any = { eyes: [{ point: new Vector3(-5, 40, 20), normal: n }, { point: new Vector3(5, 40, 20), normal: n }], puck: { point: new Vector3(0, 25, 18), normal: n } };
+    const txt = partsObj(0, { eyeSize: 2.4, eyeType: 'inset' }, place);
+    expect(txt).toContain('o eye_1'); expect(txt).toContain('o eye_2'); expect(txt).toContain('o core'); expect(txt).toContain('o magnet_1'); expect(txt).toContain('o magnet_2');
+    const core = txt.split('o core')[1].split('o magnet_1')[0];
+    const p = parseObj('o core' + core);
+    expect(p.faces.length).toBeGreaterThan(500);
+    // signed volume of the core (relative indices differ from the file: it starts after the eyes)
+    const eyesV = txt.split('o core')[0].split('\n').filter((l) => l.startsWith('v ')).length;
+    let vol = 0; for (const f of p.faces) { const [a, b, c] = f.map((i) => i - eyesV); const A = [p.positions[a * 3], p.positions[a * 3 + 1], p.positions[a * 3 + 2]], B = [p.positions[b * 3], p.positions[b * 3 + 1], p.positions[b * 3 + 2]], C = [p.positions[c * 3], p.positions[c * 3 + 1], p.positions[c * 3 + 2]]; vol += (A[0] * (B[1] * C[2] - B[2] * C[1]) - A[1] * (B[0] * C[2] - B[2] * C[0]) + A[2] * (B[0] * C[1] - B[1] * C[0])) / 6; }
+    expect(Math.abs(vol)).toBeGreaterThan(2000); // a 25 mm puck is about 4 cm3
+    expect(vol).toBeGreaterThan(0); // outward faces
+  });
+});

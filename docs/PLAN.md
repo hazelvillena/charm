@@ -1,4 +1,4 @@
-# Charmer Lab: Build Plan (living doc)
+# Clayground: Build Plan (living doc)
 
 Status: **v0 BUILT (M0 to M6 done, M7 polish in progress).** Update the checkboxes and the Log (bottom) as work proceeds.
 Companion docs: [HANDOFF.md](HANDOFF.md) (original spec), [README.md](README.md) (short version).
@@ -189,3 +189,11 @@ Cumulative: A about 3.5 h, B about 5 h, C about 7 h, full about 7.7 h.
 - 2026-11-05: Puck default set to 1 inch (25.4 mm); `REFERENCE_SCALE` 1.94 -> 1.78. Presets are generic abstract starters, not Grokbot copies.
 - 2026-11-05: Built M0 to M6 end to end. 18 tests green (invariants, 1000-case sweep, Accept on every preset, STL, share link, OBJ round trip, architecture rule). Production build verified in a browser: Accept 0.5 to 0.6 s, drag frame time about 8 ms median. Found and fixed: wall check silently passing (inner geometry index bug) and now fails when unmeasurable; loop turned black in heatmap (own material); setPointerCapture made fail-safe.
 - 2026-11-05: Not done / not verifiable here: backup screen recording, Rhino ToSubD round trip, real core dims, boolean-inset eyes (ADR 0007).
+- 2026-11-05: v0.1 changes after first review: side profile (ADR 0010), design system (ADR 0009), freehand draw (ADR 0011), inputs/outputs layout, finishes/color/split-line shader, responsive drawers. 24 tests (incl. 1000-case sweep with extreme side profiles and 24 random Accept builds, all built).
+- 2026-11-05: v0.2 changes (second review): see ADRs 0012 to 0016. 39 tests (outline editing, analysis helpers, core, materials, library, evaluate, fidelity fit, 1000-case sweep, 24 random Accepts). Accept about 0.75 s with the N = 10 cage.
+- 2026-11-05: v0.3 (third review): see ADR 0017. 41 tests including the valley regression and the poche section solids.
+- 2026-11-05: v0.4 (fourth review): see ADR 0018. 45 tests including STEP round trips through OpenCascade.
+- 2026-11-05: v0.5 (fifth review): see ADR 0019. 68 tests including the Poisson solver (exact disk, symmetry, medial-axis smoothness, warm start), Poisson-vs-legacy smoothness, mirror symmetry, every preset and starter passing every check.
+- 2026-11-05: v0.6 (sixth review): see ADR 0020. 81 tests, including eyes clear of the core on every shape and the seeded, starred library.
+
+- 2026-11-05: top bar + Clayground, pad zoom/HUD, free side points, core drag, check pointers, library variety, format-first export. ADR 0021. Next: verify the Rhino/Creo round trip with a real file.

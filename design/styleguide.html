@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clayground · Design system</title>
+  <link rel="stylesheet" href="./tokens.css" />
+  <link rel="stylesheet" href="./components.css" />
+  <style>
+    body { margin: 0; background: var(--canvas); font: var(--t-md)/1.5 var(--font-sans); color: var(--ink); }
+    main { max-width: 980px; margin: 0 auto; padding: var(--s-5) var(--s-4) 80px; display: grid; gap: var(--s-5); }
+    h1 { font-size: var(--t-xl); letter-spacing: -0.02em; margin: 0; }
+    h2 { font-size: var(--t-lg); margin: 0 0 var(--s-3); }
+    section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-4); }
+    .row { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
+    .chip-color { width: 108px; }
+    .chip-color i { display: block; height: 52px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--c); }
+    .chip-color small { display: block; color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: var(--t-xs); }
+    .brand { display: flex; gap: var(--s-4); align-items: center; }
+    .mark { width: 72px; height: 72px; filter: drop-shadow(0 4px 12px rgba(91,108,255,.35)); }
+    .demo { width: 280px; }
+  </style>
+</head>
+<body class="ui-root">
+<main>
+  <div class="brand"><div class="mark" id="mark"></div><div><h1>Clayground</h1><div class="ui-eyebrow">Design system · single source of truth</div></div></div>
+
+  <section><h2>Color</h2><div class="row" id="colors"></div></section>
+
+  <section><h2>Type</h2>
+    <div style="font-size:var(--t-num);font-weight:600;letter-spacing:-.02em">42.6 mm · display number</div>
+    <div style="font-size:var(--t-lg);font-weight:650">Section title (15)</div>
+    <div>Body (13) The quick brown fox jumps over the lazy dog.</div>
+    <div style="font-size:var(--t-sm);color:var(--ink-2)">Secondary (12)</div>
+    <div class="ui-eyebrow">Eyebrow (11, caps)</div>
+    <div class="ui-num">Tabular figures 1.60 mm · 386 verts (no monospace face anywhere)</div></section>
+
+  <section><h2>Controls</h2>
+    <div class="row" style="align-items:flex-start;gap:var(--s-5)">
+      <div class="demo ui-card-body">
+        <div class="ui-field"><div class="ui-field-top"><label>Slider</label><span class="ui-val">35.8 mm</span></div><input class="ui-range" type="range" min="0" max="100" value="62" style="--p:62%" oninput="this.style.setProperty('--p', this.value+'%')"></div>
+        <div class="ui-seg"><button class="on">Gloss</button><button>Soft-touch</button><button>Pearl</button></div>
+        <div class="row"><button class="ui-btn">Default</button><button class="ui-btn on">Selected</button><button class="ui-btn primary">Primary</button><button class="ui-btn" disabled>Disabled</button></div>
+        <div class="row"><span class="ui-tag">locked · global · TBD</span></div>
+      </div>
+      <div class="demo ui-card-body">
+        <div class="ui-float" style="padding:4px;display:inline-flex;border-radius:999px"><button class="ui-chip on">Ghost</button><button class="ui-chip">Blob</button><button class="ui-chip">Star</button></div>
+        <div class="row"><div class="ui-stat"><b>42.6<em>mm</em></b><small>width</small></div><div class="ui-stat"><b>15.7<em>g</em></b><small>est. PC</small></div></div>
+        <div class="ui-kv"><span>Wall target / min</span><b>1.6 / 1.45 mm</b></div>
+        <div class="row"><div class="ui-spinner"></div><span style="color:var(--ink-2)">Shaping your outline…</span></div>
+        <div class="ui-toast">Casing built in 558 ms.</div><div class="ui-toast error">Build failed at the inner shell.</div><div class="ui-tag-note">Inline notes are plain muted text. Messages are never boxed chips.</div>
+      </div>
+    </div></section>
+
+  <section><h2>Materials</h2><div class="ui-eyebrow" style="margin-bottom:8px">Swatches</div><div class="row" id="swatches"></div>
+    <div class="ui-eyebrow" style="margin:14px 0 8px">Finishes</div><div id="finishes" class="ui-card-body"></div></section>
+</main>
+<script type="module">
+  import { FINISHES, SWATCHES } from './finishes.ts';
+  import { brandMarkSvg } from './brand.ts';
+  document.getElementById('mark').innerHTML = brandMarkSvg('sg');
+  const vars = ['--canvas','--surface','--surface-2','--ink','--ink-2','--ink-3','--line','--line-strong','--accent','--accent-ink','--accent-soft','--ok','--bad','--warn'];
+  const cs = getComputedStyle(document.documentElement);
+  document.getElementById('colors').innerHTML = vars.map(v => `<div class="chip-color"><i style="--c:var(${v})"></i><b>${v.slice(2)}</b><small>${cs.getPropertyValue(v).trim()}</small></div>`).join('');
+  document.getElementById('swatches').innerHTML = SWATCHES.map(s => `<div style="text-align:center"><button class="ui-swatch" style="--c:${s.hex}"></button><div style="font-size:11px;color:var(--ink-3)">${s.label}</div></div>`).join('');
+  document.getElementById('finishes').innerHTML = FINISHES.map(f => `<div class="ui-kv"><b style="font-family:var(--font-sans);font-weight:600">${f.label}</b><span>${f.note} · rough ${f.roughness}${f.metalness ? ' · metal' : ''}${f.transmission ? ' · transmission ' + f.transmission : ''}${f.iridescence ? ' · iridescent' : ''}</span></div>`).join('');
+</script>
+</body>
+</html>
