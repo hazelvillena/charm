@@ -16,7 +16,7 @@ export type Iteration = {
 };
 
 const KEY = 'charmer-playground:v1';
-const VERSION = 10; // 2 = presets live in the library (starred); 3 = default eyes 2.4 mm; 4 = a varied material per built-in iteration; 5 = the attachment loop is off by default; 6-7 = thumbnails show the Core and eyes, in each item's own material (re-rendered)
+const VERSION = 11; // 2 = presets live in the library (starred); 3 = default eyes 2.4 mm; 4 = a varied material per built-in iteration; 5 = the attachment loop is off by default; 6-7 = thumbnails show the Core and eyes, in each item's own material (re-rendered)
 const cloneParams = (p: Params): Params => ({ ...p, side: cloneSide(p.side) });
 const newId = () => 'it_' + Math.random().toString(36).slice(2, 9);
 const make = (name: string, params: Params, outline: Outline, look: Look, starred: boolean): Iteration =>
@@ -75,6 +75,15 @@ export class Library {
         }
       }
       if (this.version < 10) for (const it of this.items) { if (it.name === 'Arch') it.starred = false; if (it.name === 'Clover') it.starred = true; } // Clover is the favourite, not Arch
+      if (this.version < 11) { // the flat core seat is off by default; Charmer and Arch get the small shape tweak that keeps the Core inside them without it
+        const charmer = presetItems().find((i) => i.name === 'Charmer'), arch = starterItems().find((i) => i.name === 'Arch');
+        for (const it of this.items) {
+          if (!SEED_MATERIALS[it.name]) continue;
+          it.params.corePlateau = false; it.thumb = undefined;
+          if (it.name === 'Charmer' && charmer) it.params.side = cloneSide(charmer.params.side);
+          if (it.name === 'Arch' && arch) it.outline = arch.outline;
+        }
+      }
       this.version = VERSION; this.save();
     }
   }

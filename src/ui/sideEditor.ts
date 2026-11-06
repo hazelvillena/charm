@@ -1,40 +1,40 @@
 import { svg, h } from './dom';
 import { SIDE_MAX, SIDE_MIN, SIDE_MAX_POINTS, SIDE_MIN_POINTS, SIDE_MIN_T_GAP, SideProfile, SideWhich, addSidePoint, cloneSide, removeSidePoint, removeSidePointAuto, sideTs } from '../params/side';
 import { SideCurve } from '../geometry/profile';
+import type { SideProfileCurve } from '../geometry/section';
+import { CORE } from '../params/core';
 import { Pad } from './pad';
-
-const VB_W = 76; // drawing units across: x = depth (front left, back right). The height follows the canvas, so a taller canvas spreads the profile out.
 
 type Pick = { which: SideWhich; idx: number };
 
 /**
- * Side-view editor, built on the shared Pad: drag points to shape how far the front and back extend at each height,
- * move them to any height, add one by clicking the curve, select one to delete it. The curve is always smooth.
+ * Side-view editor, built on the shared Pad and drawn in TRUE millimetres: the outline is the real silhouette of the 3D body
+ * seen from the side, and the points sit on it. Drag a point to push the body in or out at that height, move it to any
+ * height, click the outline to add one, select one to delete it. Front is on the left, back on the right.
  */
 export class SideEditor {
   readonly el: HTMLElement;
   private pad: Pad; private s: SVGSVGElement;
-  private fill: SVGPathElement; private puck: SVGRectElement; private result: SVGPathElement;
+  private fill: SVGPathElement; private puck: SVGRectElement; private axis: SVGLineElement; private frontNote: SVGTextElement; private backNote: SVGTextElement;
   private groups: Record<SideWhich, SVGGElement>;
   private side!: SideProfile;
-  private zf = 17; private zb = 13; private H = 62; private cy = 25; private vbH = 76;
+  private zf = 17; private zb = 13; private H = 62; private cy = 25;
+  private profile: SideProfileCurve | null = null;
   private active: Pick | null = null; private selected: Pick | null = null;
   private steppers: Record<SideWhich, ReturnType<typeof Pad.stepper>>;
-  private resultSegs: Float32Array | null = null;
   onChange: (s: SideProfile, final: boolean) => void = () => {};
   onReset: () => void = () => {};
 
   constructor() {
-    this.pad = new Pad({ base: { cx: 0, cy: -4 + 76 / 2, w: VB_W, h: 76 }, label: 'Side profile. Drag points, click the curve to add one.', shape: 'tall' });
+    this.pad = new Pad({ base: { cx: 0, cy: -31, w: 90, h: 90 }, label: 'Side profile, true to the 3D body. Drag points, click the outline to add one.', shape: 'tall' });
     this.s = this.pad.svg;
-    this.s.append(svg('line', { x1: 0, y1: -4, x2: 0, y2: 2000, class: 'ui-pad-axis' }));
+    this.axis = svg('line', { x1: 0, y1: 0, x2: 0, y2: -80, class: 'ui-pad-axis' }) as SVGLineElement;
     this.fill = svg('path', { class: 'ui-pad-fill' }) as SVGPathElement;
-    this.puck = svg('rect', { class: 'ui-pad-core', rx: 1.2 }) as SVGRectElement; this.puck.style.pointerEvents = 'none';
-    this.result = svg('path', { class: 'ui-pad-result' }) as SVGPathElement;
-    const front = svg('text', { x: -VB_W / 2 + 2, y: 2, class: 'ui-pad-note' }); front.textContent = 'front';
-    const back = svg('text', { x: VB_W / 2 - 2, y: 2, class: 'ui-pad-note', 'text-anchor': 'end' }); back.textContent = 'back';
+    this.puck = svg('rect', { class: 'ui-pad-core', rx: 0.8 }) as SVGRectElement; this.puck.style.pointerEvents = 'none';
+    this.frontNote = svg('text', { class: 'ui-pad-note' }) as SVGTextElement; this.frontNote.textContent = 'front';
+    this.backNote = svg('text', { class: 'ui-pad-note', 'text-anchor': 'end' }) as SVGTextElement; this.backNote.textContent = 'back';
     this.groups = { back: svg('g') as SVGGElement, front: svg('g') as SVGGElement };
-    this.s.append(this.fill, this.result, this.puck, front, back, this.groups.front, this.groups.back);
+    this.s.append(this.axis, this.fill, this.puck, this.frontNote, this.backNote, this.groups.front, this.groups.back);
     this.pad.view.onChange = () => this.render();
     this.pad.onRevert = () => this.onReset();
     this.pad.onDelete = () => this.deleteSelected();
@@ -52,24 +52,23 @@ export class SideEditor {
     this.side = side; this.zf = depthFront; this.zb = depthBack; this.H = height; this.cy = puckY; this.render();
   }
 
-  /** the true side silhouette of the finished body (x = 0 section), so this pad follows the outline parametrically */
-  setResult(segments: Float32Array) { this.resultSegs = segments; this.paintResult(); }
-  private paintResult() {
-    const a = this.resultSegs, on = !!a && a.length > 0; this.result.style.display = on ? '' : 'none'; this.fill.classList.toggle('guide', on);
-    if (!on) return; const sc = this.scale(); let d = '';
-    for (let i = 0; i < a!.length; i += 6) d += `M${(-a![i + 2] * sc).toFixed(2)} ${this.flipY(a![i + 1]).toFixed(2)}L${(-a![i + 5] * sc).toFixed(2)} ${this.flipY(a![i + 4]).toFixed(2)}`;
-    this.result.setAttribute('d', d);
-  }
+  /** the true side silhouette of the finished body (mm), measured from the 3D mesh */
+  setProfile(p: SideProfileCurve) { this.profile = p; this.render(); }
 
-  private flipY(y: number) { return this.vbH - 8 - (y / Math.max(30, this.H)) * (this.vbH - 12); }
-  private tFromY(ySvg: number) { return Math.min(1, Math.max(0, (((this.vbH - 8 - ySvg) / (this.vbH - 12)) * Math.max(30, this.H)) / this.H)); }
-  /** stylized roll-off toward the top and bottom so the drawing reads as a body (display only) */
-  private roll(t: number) { return Math.pow(Math.sin(Math.PI * (0.06 + 0.88 * Math.min(1, Math.max(0, t)))), 0.45); }
-  private scale() { return Math.min(1, 34 / Math.max(this.zf * SIDE_MAX * 0.6, this.zb * SIDE_MAX * 0.6, 1)); }
-  private depth(which: SideWhich) { return which === 'back' ? this.zb : this.zf; }
   private curve(which: SideWhich) { return new SideCurve(this.side[which], sideTs(this.side, which), this.side.smooth ?? 1); }
-  /** x of a point on a side's curve (svg units; front is left, back is right) */
-  private xOf(which: SideWhich, t: number, value: number) { return (which === 'back' ? 1 : -1) * this.depth(which) * this.scale() * this.roll(t) * value; }
+  private depth(which: SideWhich) { return which === 'back' ? this.zb : this.zf; }
+  /** how far the body reaches toward `which` at height y (mm): measured when the mesh is known, estimated before */
+  private extent(which: SideWhich, y: number): number {
+    const p = this.profile;
+    if (p && p.ys.length > 1) {
+      const arr = which === 'back' ? p.back : p.front, step = p.ys[1] - p.ys[0], f = Math.min(arr.length - 1, Math.max(0, y / step)), i = Math.min(arr.length - 2, Math.floor(f)), u = f - i;
+      return Math.abs(which === 'back' ? -(arr[i] + (arr[i + 1] - arr[i]) * u) : arr[i] + (arr[i + 1] - arr[i]) * u);
+    }
+    return this.depth(which) * this.curve(which).eval(Math.min(1, Math.max(0, y / Math.max(1, this.H)))) * 0.8;
+  }
+  /** svg x (front is left, back is right) and y (up is negative) of a point of the outline */
+  private xAt(which: SideWhich, y: number) { return (which === 'back' ? 1 : -1) * this.extent(which, y); }
+  private tFromY(ySvg: number) { return Math.min(1, Math.max(0, -ySvg / Math.max(1, this.H))); }
 
   private pointer(e: PointerEvent): [number, number] {
     const m = this.s.getScreenCTM()!.inverse(); const pt = this.s.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
@@ -94,10 +93,10 @@ export class SideEditor {
       const which = (g.dataset.w as SideWhich), idx = +g.dataset.i!;
       this.active = { which, idx }; this.selected = { which, idx }; this.render(); g.classList.add('drag'); this.capture(e); e.preventDefault(); return;
     }
-    // click on the curve adds a point at that height and starts dragging it
+    // click on the outline adds a point at that height and starts dragging it
     const [x, y] = this.pointer(e), t = this.tFromY(y), which: SideWhich = x >= 0 ? 'back' : 'front';
-    const onCurve = Math.abs(Math.abs(x) - Math.abs(this.xOf(which, t, this.curve(which).eval(t)))) < 10 * this.pad.unit();
-    if (onCurve && this.side[which].length < SIDE_MAX_POINTS) {
+    const onOutline = Math.abs(Math.abs(x) - this.extent(which, -y)) < 10 * this.pad.unit();
+    if (onOutline && this.side[which].length < SIDE_MAX_POINTS) {
       const next = addSidePoint(this.side, which, t);
       if (next) {
         const idx = sideTs(next, which).findIndex((v) => Math.abs(v - t) < 1e-6);
@@ -117,8 +116,10 @@ export class SideEditor {
       t = Math.min(Math.max(this.tFromY(ySvg), ts[a.idx - 1] + SIDE_MIN_T_GAP), ts[a.idx + 1] - SIDE_MIN_T_GAP); ts[a.idx] = t;
       if (a.which === 'back') side.backT = ts; else side.frontT = ts;
     }
-    const nominal = this.depth(a.which) * this.scale() * this.roll(t);
-    v[a.idx] = Math.min(SIDE_MAX, Math.max(SIDE_MIN, Math.abs(x) / Math.max(1e-6, nominal)));
+    // depth: the body's reach at a height scales with the point, so aim the reach at the pointer
+    const now = this.extent(a.which, t * this.H), kNow = new SideCurve(this.side[a.which], sideTs(this.side, a.which), 1).eval(t);
+    const k = now > 0.5 ? (kNow * Math.abs(x)) / now : Math.abs(x) / Math.max(1, this.depth(a.which) * 0.5);
+    v[a.idx] = Math.min(SIDE_MAX, Math.max(SIDE_MIN, k));
     this.edit(side, false);
   }
 
@@ -131,13 +132,23 @@ export class SideEditor {
 
   render() {
     if (!this.side) return;
-    if (this.pad.fitAspect(-4)) this.vbH = this.pad.view.baseSize.h;
-    const sc = this.scale(), fc = this.curve('front'), bc = this.curve('back');
-    let d = '';
-    const n = 48;
-    for (let i = 0; i <= n; i++) { const t = i / n; d += `${i ? 'L' : 'M'}${(-this.zf * sc * fc.eval(t) * this.roll(t)).toFixed(2)} ${this.flipY(t * this.H).toFixed(2)}`; }
-    for (let i = n; i >= 0; i--) { const t = i / n; d += `L${(this.zb * sc * bc.eval(t) * this.roll(t)).toFixed(2)} ${this.flipY(t * this.H).toFixed(2)}`; }
-    this.fill.setAttribute('d', d + 'Z');
+    // true scale: millimetres in both directions; the canvas shows the whole body as large as the canvas allows
+    const r = this.s.getBoundingClientRect();
+    if (r.width > 20 && r.height > 20) {
+      const asp = r.height / r.width, need = 2 * Math.max(this.zf, this.zb) * 1.15 + 14, w = Math.max(need, (this.H + 14) / asp), hh = w * asp, base = this.pad.view.baseSize;
+      if (Math.abs(w - base.w) > 0.5 || Math.abs(hh - base.h) > 0.5) this.pad.view.setBase({ cx: 0, cy: -this.H / 2, w, h: hh });
+    }
+    const b = this.pad.view.baseSize;
+    this.axis.setAttribute('y1', '0'); this.axis.setAttribute('y2', String(-this.H));
+    this.frontNote.setAttribute('x', String(b.cx - b.w / 2 + 2)); this.frontNote.setAttribute('y', String(b.cy - b.h / 2 + 5));
+    this.backNote.setAttribute('x', String(b.cx + b.w / 2 - 2)); this.backNote.setAttribute('y', String(b.cy - b.h / 2 + 5));
+    // the outline is the body's own silhouette
+    const p = this.profile;
+    if (p && p.ys.length > 1) {
+      let d = ''; p.ys.forEach((y, i) => { d += `${i ? 'L' : 'M'}${(-p.front[i]).toFixed(2)} ${(-y).toFixed(2)}`; });
+      for (let i = p.ys.length - 1; i >= 0; i--) d += `L${(-p.back[i]).toFixed(2)} ${(-p.ys[i]).toFixed(2)}`;
+      this.fill.setAttribute('d', d + 'Z');
+    }
     const u = this.pad.unit();
     for (const which of ['back', 'front'] as SideWhich[]) {
       const v = this.side[which], ts = sideTs(this.side, which), grp = this.groups[which];
@@ -149,9 +160,9 @@ export class SideEditor {
           grp.append(g);
         }
       }
-      v.forEach((val, i) => {
-        const g = grp.children[i] as SVGGElement;
-        Pad.placePoint(g, this.xOf(which, ts[i], val), this.flipY(ts[i] * this.H), u);
+      v.forEach((_, i) => {
+        const g = grp.children[i] as SVGGElement, y = ts[i] * this.H;
+        Pad.placePoint(g, this.xAt(which, y), -y, u);
         g.classList.toggle('sel', !!this.selected && this.selected.which === which && this.selected.idx === i);
       });
       this.steppers[which].set(v.length, SIDE_MIN_POINTS, SIDE_MAX_POINTS);
@@ -159,10 +170,9 @@ export class SideEditor {
     if (this.selected && this.selected.idx >= this.side[this.selected.which].length) this.selected = null;
     const sel = this.selected;
     this.pad.setCanDelete(!!sel && sel.idx > 0 && sel.idx < this.side[sel.which].length - 1 && this.side[sel.which].length > SIDE_MIN_POINTS);
-    // the Core's seat marker on the front side
-    const py = this.flipY(this.cy), ph = (25.4 / Math.max(30, this.H)) * (this.vbH - 12), tc = Math.min(1, Math.max(0, this.cy / this.H));
-    this.puck.setAttribute('x', (this.xOf('front', tc, fc.eval(tc)) - 1.2).toFixed(2));
-    this.puck.setAttribute('y', (py - ph / 2).toFixed(2)); this.puck.setAttribute('width', '3.2'); this.puck.setAttribute('height', ph.toFixed(2));
-    this.paintResult();
+    // the Core's seat on the front, at its true size
+    const d = CORE.puckDiameter;
+    this.puck.setAttribute('x', (this.xAt('front', this.cy) - 0.8).toFixed(2)); this.puck.setAttribute('y', (-(this.cy + d / 2)).toFixed(2));
+    this.puck.setAttribute('width', '1.6'); this.puck.setAttribute('height', d.toFixed(2));
   }
 }

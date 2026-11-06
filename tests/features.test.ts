@@ -137,7 +137,7 @@ describe('library', () => {
 
 describe('optional flat core seat', () => {
   it('turning it off removes the flat seat and the curvature carry-over, and every shape stays valid', () => {
-    const g = PRESETS[1], on = presetParams(g), off = { ...on, corePlateau: false };
+    const g = PRESETS[1], on = { ...presetParams(g), corePlateau: true }, off = { ...on, corePlateau: false };
     const o = clampOutline(g.outline, on.wall);
     const cageOn = new Float32Array(engine.qs.vertCount * 3), cageOff = new Float32Array(engine.qs.vertCount * 3);
     engine.buildCage(o, on, cageOn); engine.buildCage(o, off, cageOff);
@@ -145,7 +145,7 @@ describe('optional flat core seat', () => {
     expect(diff).toBeGreaterThan(0.3);                       // the surface really changes
     expect(cageOff.every(Number.isFinite)).toBe(true);
     expect(sanitizeParams({ corePlateau: false }).corePlateau).toBe(false);
-    expect(sanitizeParams({ corePlateau: 'nope' }).corePlateau).toBe(true); // junk falls back to the default
+    expect(sanitizeParams({ corePlateau: 'nope' }).corePlateau).toBe(false); // junk falls back to the default (off)
     expect(evaluateIteration(engine, o, off)).not.toBeNull();
   });
 });
@@ -296,11 +296,24 @@ describe('side silhouette', () => {
   it('shows the whole body seen from the side, not just the centre slice (the gap between feet)', async () => {
     const { sideSilhouette } = await import('../src/geometry/section');
     const pr = PRESETS[0], p = presetParams(pr), a = buildAll(clampOutline(pr.outline, p.wall), p, 2);
-    const seg = sideSilhouette(a.outer); expect(seg.length).toBeGreaterThan(300);
+    const seg = sideSilhouette(a.outer, a.faces); expect(seg.length).toBeGreaterThan(300);
     const slice = sectionSegments(a.outer, a.faces, 0, 0);
     const minY = (arr: Float32Array) => { let m = Infinity; for (let i = 1; i < arr.length; i += 3) m = Math.min(m, arr[i]); return m; };
     expect(minY(seg)).toBeLessThanOrEqual(minY(slice) + 1e-6); // the feet reach lower than the centre slice
     let zmax = -Infinity, zminSlice = Infinity; for (let i = 2; i < seg.length; i += 3) zmax = Math.max(zmax, seg[i]); for (let i = 2; i < slice.length; i += 3) zminSlice = Math.min(zminSlice, slice[i]);
     expect(Number.isFinite(zmax) && Number.isFinite(zminSlice)).toBe(true);
+  });
+});
+
+describe('side profile is true to the body and smooth', () => {
+  it('matches the 3D body extents and has no jagged steps', async () => {
+    const { sideProfileOf } = await import('../src/geometry/section');
+    const pr = PRESETS[0], p = presetParams(pr), a = buildAll(clampOutline(pr.outline, p.wall), p, 2), prof = sideProfileOf(a.outer, a.faces);
+    let zmax = -Infinity, zmin = Infinity, ymax = -Infinity, ymin = Infinity; for (let i = 0; i < a.outer.length; i += 3) { zmax = Math.max(zmax, a.outer[i + 2]); zmin = Math.min(zmin, a.outer[i + 2]); ymax = Math.max(ymax, a.outer[i + 1]); ymin = Math.min(ymin, a.outer[i + 1]); }
+    expect(Math.max(...prof.front)).toBeGreaterThan(zmax - 0.4); expect(Math.min(...prof.back)).toBeLessThan(zmin + 0.4); // reaches the true extremes
+    expect(prof.ys[prof.ys.length - 1]).toBeGreaterThan(ymax - ymin - 0.8);
+    const jag = (a: number[]) => { let w = 0; for (let i = 1; i < a.length - 1; i++) w = Math.max(w, Math.abs(a[i + 1] - 2 * a[i] + a[i - 1])); return w; }; // second difference: stair-steps show up here
+    console.log('side outline roughness (max 2nd difference, mm):', jag(prof.front).toFixed(2), jag(prof.back).toFixed(2));
+    expect(jag(prof.front)).toBeLessThan(1.2); expect(jag(prof.back)).toBeLessThan(1.2);
   });
 });

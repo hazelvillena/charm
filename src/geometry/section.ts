@@ -17,27 +17,41 @@ export function sectionSegments(pos: ArrayLike<number>, faces: Uint32Array, axis
   return new Float32Array(out);
 }
 
+/** the body seen from the side: at each height (mm, bottom = 0 upward) how far it reaches to the front (+z) and the back (-z) */
+export type SideProfileCurve = { ys: number[]; front: number[]; back: number[] };
+
 /**
- * The outline you see looking at the body from the side: at every height, the furthest the body reaches to the front (+z)
- * and to the back (-z) across ALL of it, not just the centre slice. (A slice at x = 0 runs between the feet and shows the
- * gap, not the body.) Returned as closed segment endpoints [x1,y1,z1,x2,y2,z2,...] with x = 0. Pure.
+ * The outline you see looking at the body from the side: at every height, the furthest it reaches to the front and to the
+ * back across ALL of it, not just the centre slice (a slice at x = 0 runs between the feet and shows the gap, not the body).
+ * Exact for a polygon mesh: every edge is sampled along its length (not just its corners), so the result has no
+ * vertex-spacing jaggedness; a light smoothing then removes the remaining stair-steps. Pure.
  */
-export function sideSilhouette(pos: ArrayLike<number>, step = 0.5): Float32Array {
+export function sideProfileOf(pos: ArrayLike<number>, faces: Uint32Array, step = 0.4): SideProfileCurve {
   let ymin = Infinity, ymax = -Infinity;
   for (let i = 1; i < pos.length; i += 3) { if (pos[i] < ymin) ymin = pos[i]; if (pos[i] > ymax) ymax = pos[i]; }
-  if (!(ymax > ymin)) return new Float32Array(0);
+  if (!(ymax > ymin)) return { ys: [], front: [], back: [] };
   const n = Math.max(3, Math.ceil((ymax - ymin) / step) + 1), front = new Float32Array(n).fill(-Infinity), back = new Float32Array(n).fill(Infinity);
-  for (let i = 0; i < pos.length; i += 3) {
-    const k = Math.min(n - 1, Math.round((pos[i + 1] - ymin) / step)), z = pos[i + 2];
-    if (z > front[k]) front[k] = z; if (z < back[k]) back[k] = z;
-  }
-  const ys: number[] = [], f: number[] = [], b: number[] = [];
-  for (let k = 0; k < n; k++) if (Number.isFinite(front[k]) && Number.isFinite(back[k])) { ys.push(ymin + k * step); f.push(front[k]); b.push(back[k]); }
-  const soft = (a: number[]) => a.map((v, i) => (i === 0 || i === a.length - 1 ? v : 0.25 * a[i - 1] + 0.5 * v + 0.25 * a[i + 1])); // removes vertex-spacing jitter, keeps the ends
-  const F = soft(f), B = soft(b), out: number[] = [];
-  const seg = (y1: number, z1: number, y2: number, z2: number) => out.push(0, y1, z1, 0, y2, z2);
-  for (let i = 0; i + 1 < ys.length; i++) { seg(ys[i], F[i], ys[i + 1], F[i + 1]); seg(ys[i], B[i], ys[i + 1], B[i + 1]); }
-  const last = ys.length - 1;
-  seg(ys[0], F[0], ys[0], B[0]); seg(ys[last], F[last], ys[last], B[last]);
+  const touch = (y: number, z: number) => { const k = Math.min(n - 1, Math.max(0, Math.round((y - ymin) / step))); if (z > front[k]) front[k] = z; if (z < back[k]) back[k] = z; };
+  const edge = (a: number, b: number) => {
+    const y0 = pos[a * 3 + 1], z0 = pos[a * 3 + 2], y1 = pos[b * 3 + 1], z1 = pos[b * 3 + 2], len = Math.hypot(y1 - y0, z1 - z0), m = Math.max(1, Math.ceil(len / (step * 0.5)));
+    for (let k = 0; k <= m; k++) { const t = k / m; touch(y0 + (y1 - y0) * t, z0 + (z1 - z0) * t); }
+  };
+  for (let f = 0; f < faces.length; f += 4) for (let i = 0; i < 4; i++) edge(faces[f + i], faces[f + ((i + 1) & 3)]);
+  const ys: number[] = [], F: number[] = [], B: number[] = [];
+  for (let k = 0; k < n; k++) if (Number.isFinite(front[k]) && Number.isFinite(back[k])) { ys.push(ymin + k * step - ymin); F.push(front[k]); B.push(back[k]); }
+  const soft = (a: number[]) => { // binomial smoothing, twice, ends held
+    let cur = a;
+    for (let pass = 0; pass < 2; pass++) { const nx = cur.slice(); for (let i = 2; i < cur.length - 2; i++) nx[i] = (cur[i - 2] + 4 * cur[i - 1] + 6 * cur[i] + 4 * cur[i + 1] + cur[i + 2]) / 16; cur = nx; }
+    return cur;
+  };
+  return { ys, front: soft(F), back: soft(B) };
+}
+
+/** the same outline as closed segment endpoints [x1,y1,z1,x2,y2,z2,...] (x = 0). Pure. */
+export function sideSilhouette(pos: ArrayLike<number>, faces?: Uint32Array, step = 0.5): Float32Array {
+  if (!faces) return new Float32Array(0);
+  const c = sideProfileOf(pos, faces, step), out: number[] = [], seg = (y1: number, z1: number, y2: number, z2: number) => out.push(0, y1, z1, 0, y2, z2);
+  for (let i = 0; i + 1 < c.ys.length; i++) { seg(c.ys[i], c.front[i], c.ys[i + 1], c.front[i + 1]); seg(c.ys[i], c.back[i], c.ys[i + 1], c.back[i + 1]); }
+  const last = c.ys.length - 1; if (last > 0) { seg(c.ys[0], c.front[0], c.ys[0], c.back[0]); seg(c.ys[last], c.front[last], c.ys[last], c.back[last]); }
   return new Float32Array(out);
 }

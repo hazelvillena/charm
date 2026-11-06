@@ -31,7 +31,8 @@ export const PRESETS: Preset[] = [
     params: {
       depth: GHOST_FIT.depth, belly: GHOST_FIT.belly, backFlat: 0.2, plateau: 0.95,
       eyeSize: DEFAULT_EYE_SIZE, eyeSpacing: GHOST_FIT.eyeSpacing, eyeHeight: GHOST_FIT.eyeHeight,
-      side: { back: [...SIDE_FIT.back], front: [...SIDE_FIT.front] },
+      // the fitted side, with a little more front depth low down so the Core recess stays inside the body with the flat seat off
+      side: { back: [...SIDE_FIT.back], front: SIDE_FIT.front.map((v, i) => v * ([1.3, 1.2, 1.1][i] ?? 1)) },
     },
   },
   { id: 'blob', name: 'Blob', outline: makeOutline(A7, [26, 25.5, 25, 25, 25.5, 26.5, 28]), params: { depth: 30, eyeHeight: 0.74 } },

@@ -34,7 +34,7 @@ import { h } from './ui/dom';
 import { checkFit, CheckResult } from './checks/fit';
 import { checkNook } from './checks/nook';
 import { draftAngles, checkDraft, curvatureRadii } from './checks/analysis';
-import { sectionSegments, sideSilhouette } from './geometry/section';
+import { sectionSegments, sideProfileOf } from './geometry/section';
 import { partsObj } from './io/exportObj';
 import { nurbsBodyStep } from './io/exportNurbs';
 import { limitPositions, cageFaceGrids } from './geometry/nurbs';
@@ -225,7 +225,7 @@ function live() {
   view.setTarget(height * 0.46);
   sideEditor.set(s.params.side, i.zFront, i.zBack, height, i.shiftY);
   editor.setResult(sectionSegments(buf2, engine.smoothFaces(2), 2, 0), i.shiftY);
-  sideEditor.setResult(sideSilhouette(buf2)); // both pads follow the body parametrically
+  sideEditor.setProfile(sideProfileOf(buf2, engine.smoothFaces(2))); // the side pad draws the body's true silhouette
   pushLive(b);
 }
 

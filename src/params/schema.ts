@@ -28,7 +28,7 @@ export const SCHEMA: ParamDef[] = [
   { id: 'depth', label: 'Depth', group: 'body', kind: 'range', min: 10, max: 42, step: 0.5, default: 30, unit: 'mm' },
   { id: 'belly', label: 'Belly', group: 'body', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.5 },
   { id: 'backFlat', label: 'Back flatness', group: 'body', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.5 },
-  { id: 'corePlateau', label: 'Flat core seat', group: 'attach', kind: 'toggle', default: true, hint: 'Flat seat and core curvature' },
+  { id: 'corePlateau', label: 'Flat core seat', group: 'attach', kind: 'toggle', default: false, hint: 'Flat seat and core curvature' },
   { id: 'plateau', label: 'Seat size', group: 'attach', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.8 },
   { id: 'eyes', label: 'Eyes', group: 'face', kind: 'enum', options: ['two', 'one', 'none'], default: 'two', hint: 'Two eyes, a single centred eye, or none' },
   { id: 'eyeSize', label: 'Eye size', group: 'face', kind: 'range', min: 1, max: 4, step: 0.2, default: 2.4, unit: 'mm' },

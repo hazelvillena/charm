@@ -60,3 +60,6 @@ Self-hosted Instrument Sans; Lucide icons; unroll component (spin once, options 
 
 ## 2026-11-06 · NURBS STEP
 Export has a STEP · NURBS row: the outer body as 600 bicubic B-spline patches (ADR 0023), verified through OpenCascade. The hollow casing stays faceted.
+
+## 2026-11-06 · Side canvas true to the 3D body
+The side pad now draws the body's real silhouette in true millimetres (exact edge-sampled projection, lightly smoothed) with the points on the outline; dragging aims the body's reach at the pointer. The flat core seat is off by default (Charmer gets a little more front depth low down and Arch a lower flat base so both still pass Core fit without it). Pads always keep their whole drawing area in view.

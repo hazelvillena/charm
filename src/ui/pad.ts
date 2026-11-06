@@ -23,13 +23,13 @@ export class Pad {
   readonly hud = h('div', { class: 'ui-pad-hud' });
   /** quiet options along the bottom edge, inside the container (Original, Reset) */
   readonly foot = h('div', { class: 'ui-pad-foot' });
-  private deleteBtn: HTMLButtonElement;
+  private deleteBtn: HTMLButtonElement; private minW = 100; private minH = 100;
   onRevert: () => void = () => {};
   onDelete: () => void = () => {};
 
   constructor(opts: { base: { cx: number; cy: number; w: number; h: number }; label: string; shape?: 'square' | 'tall' }) {
     this.svg = svg('svg', { class: `ui-pad-svg ${opts.shape ?? 'square'}`, 'aria-label': opts.label, tabindex: 0, viewBox: `${opts.base.cx - opts.base.w / 2} ${opts.base.cy - opts.base.h / 2} ${opts.base.w} ${opts.base.h}` }) as SVGSVGElement;
-    this.view = new PadView(this.svg, opts.base);
+    this.view = new PadView(this.svg, opts.base); this.minW = opts.base.w; this.minH = opts.base.h;
     this.deleteBtn = Pad.iconButton(ICONS.trash, 'Delete the selected point', () => this.onDelete());
     this.deleteBtn.disabled = true;
     const reset = h('button', { type: 'button', class: 'ui-pad-link', text: 'Reset', title: 'Back to how this canvas was when loaded or last saved', onClick: () => this.onRevert() });
@@ -56,9 +56,9 @@ export class Pad {
    */
   fitAspect(top?: number): boolean {
     const r = this.svg.getBoundingClientRect(); if (r.width < 20 || r.height < 20) return false;
-    const base = this.view.baseSize, hh = base.w * (r.height / r.width);
-    if (Math.abs(hh - base.h) < 0.4) return false;
-    this.view.setBase({ cx: base.cx, cy: top === undefined ? base.cy : top + hh / 2, w: base.w, h: hh }); return true;
+    const base = this.view.baseSize, asp = r.height / r.width, w = Math.max(this.minW, this.minH / asp), hh = w * asp; // always keeps the whole drawing area in view
+    if (Math.abs(hh - base.h) < 0.4 && Math.abs(w - base.w) < 0.4) return false;
+    this.view.setBase({ cx: base.cx, cy: top === undefined ? base.cy : top + hh / 2, w, h: hh }); return true;
   }
 
   /** unit: svg units per screen pixel. Sizes a point so it stays the same on screen at any zoom. */

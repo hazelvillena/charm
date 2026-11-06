@@ -20,7 +20,7 @@ const bump = (phi: number, at: number, w: number) => Math.exp(-(((phi - at * D) 
 
 export const STARTERS: Starter[] = [
   // flat base, round top: nothing else in the library has a straight edge on the bottom
-  { name: 'Arch', outline: polar((p) => { const flat = 18 / Math.max(1e-3, Math.abs(sinc(p))), k = 2.2, below = p < 0 ? -k * Math.log(Math.exp(-flat / k) + Math.exp(-30 / k)) : 30 - 3 * sinc(p) ** 2; return below; }, 11), params: { depth: 30, belly: 0.5, backFlat: 0.7, eyeHeight: 0.7 }, look: { color: '#F3EEE3', finish: 'matte' } },
+  { name: 'Arch', outline: polar((p) => { const flat = 21 / Math.max(1e-3, Math.abs(sinc(p))), k = 2.2, below = p < 0 ? -k * Math.log(Math.exp(-flat / k) + Math.exp(-30 / k)) : 30 - 3 * sinc(p) ** 2; return below; }, 11), params: { depth: 30, belly: 0.5, backFlat: 0.7, eyeHeight: 0.7 }, look: { color: '#F3EEE3', finish: 'matte' } },
   { name: 'Seed', outline: polar((p) => 20 + 13 * Math.abs(sinc(p)) ** 1.6, 9), params: { depth: 26, belly: 0.4, backFlat: 0.4, eyeHeight: 0.7 }, look: { color: '#A9C4F5', finish: 'gloss' } },
   { name: 'Trefoil', outline: polar((p) => 27 + 6.5 * Math.cos(3 * (p - 90 * D)), 9), params: { depth: 28, belly: 0.5, backFlat: 0.3, eyeHeight: 0.6 }, look: { color: '#BFE8D2', finish: 'gloss' } },
   { name: 'Clover', outline: polar((p) => 26 + 5 * Math.cos(4 * p), 9), params: { depth: 27, belly: 0.5, backFlat: 0.3, eyeHeight: 0.6 }, look: { color: '#F6C1B5', finish: 'gloss' } },
