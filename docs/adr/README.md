@@ -27,3 +27,4 @@ Status is `accepted`, `superseded by NNNN`, or `proposed`. **Add a new ADR (or s
 | [0020](0020-library-is-the-source-of-truth.md) | Library is the source of truth; stars drive the pill; Save; sketch dock | accepted |
 - [0021](0021-top-bar-pads-and-check-pointers.md) · One top bar, zoomable pads, checks that point
 - [0022](0022-pad-component-variable-side-points-and-complete-exports.md) · One Pad component, editable side points, a plain sanity check, complete exports
+- [0023](0023-nurbs-step-export.md) · NURBS STEP export of the outer body

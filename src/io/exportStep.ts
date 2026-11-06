@@ -3,8 +3,8 @@
  * (MANIFOLD_SOLID_BREP, ADVANCED_FACE on a PLANE, shared EDGE_CURVEs), the form every CAD kernel reads
  * (verified by round-tripping through OpenCascade in the tests; the POLY_LOOP "faceted_brep" form is silently
  * dropped by OpenCascade, so it is not used). CAD tools (Creo, Rhino, SolidWorks, Fusion) import the result as
- * a solid body for reference, mass properties and assembly. It is faceted, NOT NURBS: for true surfaces take the
- * cage OBJ to Rhino (ToSubD, then ToNURBS). Pure function, no DOM.
+ * a solid body for reference, mass properties and assembly. It is faceted, NOT NURBS: for true smooth surfaces use
+ * exportNurbs.ts (STEP with bicubic B-spline patches) or take the cage OBJ to Rhino (ToSubD, then ToNURBS). Pure function, no DOM.
  */
 export type StepBody = { name: string; positions: ArrayLike<number>; tris: ArrayLike<number> };
 export type StepStats = { bodies: number; faces: number; points: number; edges: number; bytes: number };

@@ -57,3 +57,6 @@ Charmer rename; shared Pad component (ADR 0022); side profile points editable (4
 
 ## 2026-11-06 · Polish pass
 Self-hosted Instrument Sans; Lucide icons; unroll component (spin once, options roll out, toolbar pinned so the eye never moves); undo/redo; eyes two/one/none; canvases resizable with Original and Reset along the bottom; side pad draws the true side silhouette and the side curve is a natural spline; Core top is one smooth dome; section prepared before the view switches; poche tokens (design/poche.ts). 91 tests pass.
+
+## 2026-11-06 · NURBS STEP
+Export has a STEP · NURBS row: the outer body as 600 bicubic B-spline patches (ADR 0023), verified through OpenCascade. The hollow casing stays faceted.

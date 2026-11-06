@@ -36,6 +36,8 @@ import { checkNook } from './checks/nook';
 import { draftAngles, checkDraft, curvatureRadii } from './checks/analysis';
 import { sectionSegments, sideSilhouette } from './geometry/section';
 import { partsObj } from './io/exportObj';
+import { nurbsBodyStep } from './io/exportNurbs';
+import { limitPositions, cageFaceGrids } from './geometry/nurbs';
 import { checkWall, innerGeometry } from './checks/wall';
 import { encodeShare, decodeShare } from './io/share';
 import { quadObj } from './io/exportObj';
@@ -543,6 +545,14 @@ outputs.onExport = (k) => {
   try {
     if (k === 'cage') { download('charmer-cage.obj', quadObj('charmer_cage', cage, engine.qs.faces, V, 'Clayground cage (quads). In Rhino: ToSubD on the cage object. Units mm.') + (place ? partsObj(V, store.state.params, place) : ''), 'text/plain'); toast('OBJ saved'); }
     else if (k === 'smooth') { download('charmer-smooth.obj', quadObj('charmer_smooth', buf3, engine.smoothFaces(3), engine.smoothVertCount(3), 'Clayground mesh, subdivision level 3. Units mm.') + (place ? partsObj(engine.smoothVertCount(3), store.state.params, place) : ''), 'text/plain'); toast('OBJ saved'); }
+    else if (k === 'nurbs') {
+      settle(); // make sure the cage is current
+      const L = 2, pos = new Float32Array(engine.smoothVertCount(L) * 3); engine.smoothInto(cage, L, pos);
+      const limit = limitPositions(pos, engine.smoothFaces(L), pos.length / 3), grids = cageFaceGrids(engine.qs.faces.length / 4, L, engine.smoothFaces(L), limit);
+      const name = store.state.name || 'Custom', { text, stats } = nurbsBodyStep(engine.qs.faces, grids, L, { productName: name, fileName: `${name}-nurbs.step`, description: `Clayground ${name}: outer body as NURBS surfaces` });
+      download(`${name}-nurbs.step`, text, 'application/step');
+      toast(`STEP saved · NURBS · ${stats.patches} patches · ${(stats.bytes / 1048576).toFixed(1)} MB`, 'info', 6000);
+    }
     else accept.export(k).catch((e) => { console.error(e); toast('Export failed', 'error'); });
   } catch (e) { console.error(e); toast('Export failed', 'error'); }
 };
