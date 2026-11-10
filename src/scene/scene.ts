@@ -1,7 +1,7 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, PMREMGenerator, Group, Mesh, BufferGeometry, Float32BufferAttribute,
   Uint32BufferAttribute, MeshPhysicalMaterial, MeshBasicMaterial, LineSegments, LineBasicMaterial, Points, PointsMaterial,
-  CylinderGeometry, TorusGeometry, SphereGeometry, Vector3, Quaternion, DirectionalLight, HemisphereLight, CanvasTexture,
+  CylinderGeometry, SphereGeometry, Shape, Path, ExtrudeGeometry, Vector3, Quaternion, DirectionalLight, HemisphereLight, CanvasTexture,
   PlaneGeometry, NeutralToneMapping, DoubleSide, FrontSide, Object3D, Material, Plane, ShaderMaterial,
   MeshLambertMaterial, Sprite, SpriteMaterial,
 } from 'three';
@@ -9,7 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MeshBVH } from 'three-mesh-bvh';
 import { triangulate } from '../geometry/mesh';
-import { Placement, loopRing } from '../geometry/features';
+import { Placement, loopSlot } from '../geometry/features';
 import { CORE } from '../params/core';
 import { Params } from '../params/schema';
 import { Look, finishById, DEFAULT_LOOK } from '../../design/finishes';
@@ -122,9 +122,8 @@ export class SceneView {
     for (let i = 0; i < 2; i++) { const m = new Mesh(new SphereGeometry(1, 24, 16), this.eyeMat); m.visible = false; this.eyes.push(m); this.root.add(m); }
     this.puck = makePuck(); this.puck.visible = false;
     this.root.add(this.puck);
-    const lr = loopRing();
     this.loopMat = this.shellMat.clone();
-    this.loopMesh = new Mesh(new TorusGeometry(lr.major, lr.tube, 18, 40), this.loopMat);
+    this.loopMesh = new Mesh(loopLugGeometry(), this.loopMat);
     this.loopMesh.visible = false; this.root.add(this.loopMesh);
 
     // inner shell (ghost + section views), magnets, section lines, zebra material
@@ -221,6 +220,7 @@ export class SceneView {
     if (pl.loop) {
       this.loopMesh.visible = !hideForSection;
       this.loopMesh.position.copy(pl.loop.center);
+      this.loopMesh.rotation.z = Math.atan2(pl.loop.outward.y, pl.loop.outward.x) - Math.PI / 2; // long side of the slot runs along the edge
     } else this.loopMesh.visible = false;
   }
 
@@ -365,3 +365,16 @@ export class SceneView {
   dispose(m: Material) { m.dispose(); }
 }
 export { DoubleSide };
+
+/** the loop lug: a rounded slot (stadium) in a stadium-shaped boss, as built into the shell */
+function loopLugGeometry() {
+  const l = loopSlot(), stad = (p: Shape | Path, len: number, w: number, ccw: boolean) => {
+    const r = w / 2, a = len / 2 - r;
+    if (ccw) { p.absarc(a, 0, r, -Math.PI / 2, Math.PI / 2, false); p.absarc(-a, 0, r, Math.PI / 2, Math.PI * 1.5, false); }
+    else { p.absarc(-a, 0, r, Math.PI * 1.5, Math.PI / 2, true); p.absarc(a, 0, r, Math.PI / 2, -Math.PI / 2, true); }
+  };
+  const outer = new Shape(); stad(outer, l.length + 2 * l.boss, l.width + 2 * l.boss, true);
+  const hole = new Path(); stad(hole, l.length, l.width, false); outer.holes.push(hole);
+  const th = CORE.loop.minThickness + 1, g = new ExtrudeGeometry(outer, { depth: th, bevelEnabled: false, curveSegments: 24 });
+  g.translate(0, 0, -th / 2); return g;
+}

@@ -1,0 +1,102 @@
+import { describe, it, expect } from 'vitest';
+import { PRESETS, presetParams } from '../src/params/presets';
+import { clampOutline } from '../src/params/outline';
+import { buildCasing } from '../src/geometry/solids';
+import { buildAll } from './helpers';
+import { getManifold } from '../src/geometry/kernel';
+import { PRINT } from '../src/params/print';
+import { CORE } from '../src/params/core';
+import { meshHealth } from '../src/geometry/meshHealth';
+
+const weldedProblems = meshHealth;
+
+const bbox = (m: { positions: Float32Array }) => {
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < m.positions.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], m.positions[i + k]); hi[k] = Math.max(hi[k], m.positions[i + k]); }
+  return { lo, hi };
+};
+
+async function build(presetIx: number, patch: Record<string, unknown>, print: boolean) {
+  const pr = PRESETS[presetIx], params = { ...presetParams(pr), ...patch } as any;
+  const a = buildAll(clampOutline(pr.outline, params.wall), params, 3);
+  return { casing: await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params, place: a.place, print }), place: a.place, params };
+}
+
+describe('3D print prototype export', () => {
+  for (const ix of [0, 1]) {
+    it(`${PRESETS[ix].id}: parts lie flat on the plate, apart, with the Core as a fit dummy`, async () => {
+      const { casing } = await build(ix, {}, true);
+      const pp = casing.print!.parts;
+      expect(pp.map((x) => x.name)).toEqual(['Front shell', 'Back shell', 'Core (fit dummy)']);
+      const boxes = pp.map((x) => bbox(x.mesh));
+      for (const b of boxes) { expect(b.lo[2]).toBeCloseTo(0, 3); expect(Math.abs(b.lo[1] + b.hi[1])).toBeLessThan(1e-3); }
+      for (let i = 1; i < boxes.length; i++) expect(boxes[i].lo[0] - boxes[i - 1].hi[0]).toBeGreaterThanOrEqual(PRINT.gap - 1e-3); // no overlap, a gap between
+      // the dummy Core is the real puck size (the clearance is in the seat)
+      expect(boxes[2].hi[0] - boxes[2].lo[0]).toBeCloseTo(CORE.puckDiameter, 1);
+      // eyes are engraved into the front shell, not exported as parts
+      expect(pp.some((x) => /eye/i.test(x.name))).toBe(false);
+      // clean for slicers (Bambu Studio flagged a non-manifold edge once): every part is closed and consistently wound
+      for (const x of pp) expect(weldedProblems(x.mesh), x.name).toEqual({ open: 0, flipped: 0 });
+    }, 30000);
+  }
+
+  it('engraves the eyes: the print front shell has less material than the plain one; with eyes off it is the same apart from the joint', async () => {
+    const plain = await build(0, {}, false), printed = await build(0, {}, true);
+    expect(printed.casing.frontVolume).not.toBeCloseTo(plain.casing.frontVolume, 0); // rim band + rebate + engraving all change it
+    const noEyes = await build(0, { eyes: 'none' }, true);
+    expect(noEyes.casing.frontVolume).toBeGreaterThan(printed.casing.frontVolume); // two engraved recesses removed more
+    expect(printed.casing.print!.parts.length).toBe(3);
+  }, 40000);
+
+  it('half-lap joint: the shells fit together without overlapping and the rim magnet pockets are real', async () => {
+    const { casing } = await build(0, {}, true);
+    const api = await getManifold();
+    const mk = (m: { positions: Float32Array; tris: Uint32Array }) => new api.Manifold(new api.Mesh({ numProp: 3, vertProperties: m.positions.slice(), triVerts: m.tris.slice() }));
+    const f = mk(casing.front), b = mk(casing.back);
+    expect(f.status()).toBe('NoError'); expect(b.status()).toBe('NoError');
+    // assembled (not laid out): the back's lap sits in the front's rebate with clearance, so the two never intersect
+    const inter = f.intersect(b);
+    expect(inter.volume()).toBeLessThan(0.5); // mm3: touching faces only
+    expect(casing.print!.rimMagnets % 2).toBe(0);
+    console.log('rim magnets', casing.print!.rimMagnets, 'front cm3', (casing.frontVolume / 1000).toFixed(2), 'back cm3', (casing.backVolume / 1000).toFixed(2));
+  }, 40000);
+
+  it('loop is a rounded slot built into the shell, near the top but off the tip', async () => {
+    const { casing, place, params } = await build(0, { loop: true }, true);
+    for (const x of casing.print!.parts) expect(weldedProblems(x.mesh), x.name).toEqual({ open: 0, flipped: 0 });
+    expect(place.loop).not.toBeNull();
+    const c = place.loop!.center;
+    expect(c.z).toBeLessThan(0); // toward the back half
+    expect(casing.front.tris.length).toBeGreaterThan(0); expect(casing.back.tris.length).toBeGreaterThan(0);
+    const plain = await build(0, { loop: false }, true);
+    expect(casing.shellVolume).not.toBeCloseTo(plain.casing.shellVolume, 0);
+    expect(params.loop).toBe(true);
+  }, 40000);
+});
+
+describe('print prototype across the built-in shapes', () => {
+  for (let ix = 0; ix < PRESETS.length; ix++) {
+    it(`${PRESETS[ix].id}: builds, joint does not collide`, async () => {
+      const { casing } = await build(ix, {}, true);
+      const api = await getManifold();
+      const mk = (m: { positions: Float32Array; tris: Uint32Array }) => new api.Manifold(new api.Mesh({ numProp: 3, vertProperties: m.positions.slice(), triVerts: m.tris.slice() }));
+      const f = mk(casing.front), b = mk(casing.back);
+      expect(f.status()).toBe('NoError'); expect(b.status()).toBe('NoError');
+      expect(f.intersect(b).volume()).toBeLessThan(0.5);
+      for (const x of casing.print!.parts) expect(weldedProblems(x.mesh), `${PRESETS[ix].id} ${x.name}`).toEqual({ open: 0, flipped: 0 });
+      console.log(PRESETS[ix].id, 'rim magnets', casing.print!.rimMagnets);
+    }, 40000);
+  }
+});
+
+describe('every STL output is watertight for slicers (root guard for all exports)', () => {
+  for (let ix = 0; ix < PRESETS.length; ix++) for (const loop of [false, true]) {
+    it(`${PRESETS[ix].id}${loop ? ' with loop' : ''}: shells, parts and print layout`, async () => {
+      for (const print of [false, true]) {
+        const { casing } = await build(ix, { loop }, print);
+        const meshes = [['front', casing.front], ['back', casing.back], ['core', casing.parts.core], ...casing.parts.magnets.map((m, i) => [`magnet ${i}`, m] as const), ...casing.parts.eyes.map((m, i) => [`eye ${i}`, m] as const), ...(casing.print?.parts ?? []).map((x) => [x.name, x.mesh] as const)] as const;
+        for (const [name, m] of meshes) expect(meshHealth(m), `${PRESETS[ix].id} ${loop ? 'loop ' : ''}${print ? 'print ' : ''}${name}`).toEqual({ open: 0, flipped: 0 });
+      }
+    }, 60000);
+  }
+});

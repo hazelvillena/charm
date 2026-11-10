@@ -34,7 +34,10 @@ export const EYE_CORE_MARGIN = 1.5;
 /** smallest distance from the core centre at which an eye of this size may sit (seat + wall + margin + the eye's own half height) */
 export function eyeClearance(p: Params): number { return seatRadius() + p.wall + EYE_CORE_MARGIN + 0.8 * p.eyeSize; }
 
-export const LOOP_INSET = 1.5; // loop center sits this far inside the outline (lug sticks out)
+/** the loop sits toward the back half, so it is on the top edge but not on the very tip */
+export const LOOP_BACK = 0.25; // fraction of the depth behind the mid plane
+/** loop centre sits this far inside the outline: the slot's half width plus a firm bridge of plastic */
+export const loopInset = () => CORE.loop.holeWidth / 2 + 1.6;
 
 export function loopDir(pos: Params['nookPos']) {
   const deg = pos === 'top' ? 90 : pos === 'top-left' ? 112 : 68;
@@ -59,15 +62,13 @@ export function placeFeatures(bvh: MeshBVH, geo: BufferGeometry, p: Params, shif
   const puck = castSurface(bvh, geo, new Vector3(0, shiftY, 300), dn);
   const back = castSurface(bvh, geo, new Vector3(0, shiftY, -300), new Vector3(0, 0, 1));
   const d = loopDir(p.nookPos);
-  const h = castSurface(bvh, geo, new Vector3(0, shiftY, 0), d, DoubleSide);
-  const loop = p.loop !== false && h ? { center: h.point.clone().addScaledVector(d, -LOOP_INSET), outward: d } : null; // the loop is optional
+  const h = castSurface(bvh, geo, new Vector3(0, shiftY, -LOOP_BACK * p.depth), d, DoubleSide);
+  const loop = p.loop !== false && h ? { center: h.point.clone().addScaledVector(d, -loopInset()), outward: d } : null; // the loop is optional
   return { eyes, puck, backZ: back ? back.point.z : null, loop };
 }
 
-export const loopRing = () => ({
-  tube: CORE.loop.boss / 2,
-  major: CORE.loop.holeDiameter / 2 + CORE.loop.boss / 2,
-});
+/** the thread slot (a stadium: length along the edge, width across it) and the lug around it */
+export const loopSlot = () => ({ length: CORE.loop.holeLength, width: CORE.loop.holeWidth, boss: CORE.loop.boss });
 
 export type V3 = { x: number; y: number; z: number };
 /** a right-handed frame whose z axis is `n` (the surface normal), x kept roughly horizontal */
@@ -83,5 +84,13 @@ export function eyeShapes(place: Pick<Placement, 'eyes'>, p: Pick<Params, 'eyeSi
   return place.eyes.filter((e): e is NonNullable<typeof e> => !!e).map((e) => ({
     c: { x: e.point.x + e.normal.x * off * rz, y: e.point.y + e.normal.y * off * rz, z: e.point.z + e.normal.z * off * rz },
     ...frameOf(e.normal), rx: sz / 2, ry: (sz * 1.57) / 2, rz,
+  }));
+}
+
+/** engraved eyes: shallow ellipsoid recesses centred on the surface (the print has no separate eye parts) */
+export function engraveShapes(place: Pick<Placement, 'eyes'>, p: Pick<Params, 'eyeSize'>, depth: number) {
+  const sz = p.eyeSize;
+  return place.eyes.filter((e): e is NonNullable<typeof e> => !!e).map((e) => ({
+    c: { x: e.point.x, y: e.point.y, z: e.point.z }, ...frameOf(e.normal), rx: sz / 2, ry: (sz * 1.57) / 2, rz: depth,
   }));
 }

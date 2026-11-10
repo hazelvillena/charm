@@ -14,6 +14,7 @@ import { ExplodedView } from './scene/exploded';
 import { buildSpec, Spec } from './spec/spec';
 import { bounds } from './geometry/mesh';
 import { binaryStl } from './io/exportStl';
+import { meshHealth } from './geometry/meshHealth';
 import { download } from './ui/download';
 import { toast } from './ui/toast';
 
@@ -82,18 +83,51 @@ export function setupAccept(ctx: AcceptCtx) {
   };
   toolbar.onExplode = () => { store.state.exploded = !store.state.exploded; exploded?.setExploded(store.state.exploded); toolbar.setExploded(store.state.exploded); };
 
+  /** every part in one binary STL (STL has no parts, so they travel together) */
+  /** every STL leaves through here: if a part is ever not watertight the user is told, not left to find it in the slicer */
+  const warnIfLeaky = (named: [string, { positions: Float32Array; tris: Uint32Array }][]) => {
+    const bad = named.filter(([, m]) => { const h = meshHealth(m); return h.open + h.flipped > 0; }).map(([n]) => n);
+    if (bad.length) toast(`Heads up: ${bad.join(', ')} may need repair in the slicer`, 'error', 8000);
+  };
+  const mergeStl = (meshes: { positions: Float32Array; tris: Uint32Array }[], title: string) => {
+    let nv = 0, nt = 0; for (const m of meshes) { nv += m.positions.length; nt += m.tris.length; }
+    const pos = new Float32Array(nv), tris = new Uint32Array(nt); let vo = 0, to = 0;
+    for (const m of meshes) { pos.set(m.positions, vo); for (let i = 0; i < m.tris.length; i++) tris[to + i] = m.tris[i] + vo / 3; vo += m.positions.length; to += m.tris.length; }
+    return binaryStl(pos, tris, title);
+  };
+
+  /** the prototype for a desktop printer: built fresh (half-lap seam, rim magnet pockets, engraved eyes) and laid flat */
+  const exportPrint = async () => {
+    const place = ctx.getPlace();
+    if (!place || !ctx.getInfo()) { toast('No valid shape to print yet', 'error'); return; }
+    toast('Preparing the print files…');
+    ctx.settleNow();
+    const s = store.state, outerPos = new Float32Array(engine.smoothVertCount(3) * 3); engine.smoothInto(ctx.getCage(), 3, outerPos);
+    const innerPos = new Float32Array(engine.smoothVertCount(3) * 3);
+    if (!engine.innerSurface(outerPos, 3, s.params.wall, innerPos)) { toast('Print build failed at inner shell', 'error'); return; }
+    try {
+      const c = await buildCasing({ outerPos, innerPos, faces: engine.smoothFaces(3), params: s.params, place, print: true });
+      const name = s.name || 'Custom';
+      warnIfLeaky(c.print!.parts.map((x) => [x.name, x.mesh]));
+      download(`${name}-3dprint.stl`, mergeStl(c.print!.parts.map((x) => x.mesh), 'clayground 3d print: front shell, back shell, core fit dummy'));
+      toast(`3D print STL saved · front, back, Core dummy · ${c.print!.rimMagnets} rim magnets (5×2 mm)`, 'info', 7000);
+    } catch (e) {
+      console.error(e);
+      toast(`Print build failed at ${e instanceof AcceptError ? e.step : 'unknown'}`, 'error');
+    }
+  };
+
   return {
     async export(kind: string) {
+      if (kind === 'print') { await exportPrint(); return; }
       if (!casing || !spec) { await outputs.onBuild(); if (!casing || !spec) return; } // STL and STEP need the solids, so prepare the preview first
       const pr = casing.parts, hardware = [{ name: 'Core', mesh: pr.core }, ...pr.magnets.map((m, i) => ({ name: `Magnet ${i + 1}`, mesh: m })), ...pr.eyes.map((m, i) => ({ name: `Eye ${i + 1}`, mesh: m }))];
       if (kind === 'stl') {
+        warnIfLeaky([['Front shell', casing.front], ['Back shell', casing.back], ...hardware.map((h): [string, typeof h.mesh] => [h.name, h.mesh])]);
         download(`${spec.name}-front.stl`, binaryStl(casing.front.positions, casing.front.tris, 'clayground front shell'));
         download(`${spec.name}-back.stl`, binaryStl(casing.back.positions, casing.back.tris, 'clayground back shell'));
         // the Core, magnets and eyes in one file (STL has no parts, so they travel together)
-        let nv = 0, nt = 0; for (const h of hardware) { nv += h.mesh.positions.length; nt += h.mesh.tris.length; }
-        const pos = new Float32Array(nv), tris = new Uint32Array(nt); let vo = 0, to = 0;
-        for (const h of hardware) { pos.set(h.mesh.positions, vo); for (let i = 0; i < h.mesh.tris.length; i++) tris[to + i] = h.mesh.tris[i] + vo / 3; vo += h.mesh.positions.length; to += h.mesh.tris.length; }
-        download(`${spec.name}-core-and-parts.stl`, binaryStl(pos, tris, 'clayground core, magnets and eyes'));
+        download(`${spec.name}-core-and-parts.stl`, mergeStl(hardware.map((h) => h.mesh), 'clayground core, magnets and eyes'));
         toast('STL saved · shells and parts');
       } else if (kind === 'step') {
         toast('Preparing STEP…');

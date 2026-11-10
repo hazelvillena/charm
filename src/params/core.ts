@@ -8,9 +8,9 @@ export const CORE = {
   puckClearance: 0.3,   // radial, TBD
   domeHeight: 1.6,      // pillowed top: how far the dome rises above the flat top plane
   edgeRadius: 2.4,      // rounded top edge of the core
-  magnet: { diameter: 6, thickness: 2, count: 2, spacing: 14, gap: 1.0 }, // gap = plastic floor between magnet and core, TBD
+  magnet: { diameter: 5, thickness: 2, count: 2, spacing: 14, gap: 1.0 }, // gap = plastic floor between magnet and core, TBD
   notch: { width: 3, depth: 1.5 },   // fingernail release at the bottom of the seat, TBD
-  loop: { holeDiameter: 4, boss: 3, minThickness: 3 }, // TBD
+  loop: { holeWidth: 3, holeLength: 7, boss: 2.2, minThickness: 3 }, // a rounded thread slot (width x length) in a lug; TBD
 };
 
 export type CoreKey = 'puckDiameter' | 'puckDepth' | 'domeHeight' | 'edgeRadius' | 'magnetGap';

@@ -38,8 +38,9 @@ export class OutputsPanel {
     this.build.addEventListener('click', () => this.onBuild());
     this.casingBody.append(this.build);
     // export: just the formats
-    const TITLES: Record<string, string> = { cage: 'Quad control mesh for Rhino ToSubD, plus the eyes, Core and magnets as separate objects', smooth: 'Finished body plus the eyes, Core and magnets as separate objects', stl: 'Front and back shells, plus the Core, magnets and eyes', step: 'Shells, Core, magnets and eyes as separate solids (faceted)', nurbs: 'The outer body as smooth NURBS surfaces (not hollow): shell and edit it in Creo or Rhino' };
-    const FORMATS: [string, string, string][] = [['cage', 'OBJ', 'SubD'], ['smooth', 'OBJ', 'Mesh'], ['stl', 'STL', ''], ['nurbs', 'STEP', 'NURBS'], ['step', 'STEP', 'Solids']];
+    const TITLES: Record<string, string> = { cage: 'Quad control mesh for Rhino ToSubD, plus the eyes, Core and magnets as separate objects', smooth: 'Finished body plus the eyes, Core and magnets as separate objects', stl: 'Front and back shells, plus the Core, magnets and eyes',
+      print: 'One STL for a desktop printer (PLA or ABS): front and back shell laid flat with a half-lap seam and magnet pockets, eyes engraved, plus a Core fit dummy', step: 'Shells, Core, magnets and eyes as separate solids (faceted)', nurbs: 'The outer body as smooth NURBS surfaces (not hollow): shell and edit it in Creo or Rhino' };
+    const FORMATS: [string, string, string][] = [['cage', 'OBJ', 'SubD'], ['smooth', 'OBJ', 'Mesh'], ['stl', 'STL', ''], ['print', 'STL', '3D print'], ['nurbs', 'STEP', 'NURBS'], ['step', 'STEP', 'Solids']];
     this.exportMenu = h('div', { class: 'exp-menu hidden' }, ...FORMATS.map(([kind, title, ext]) => { const b = h('button', { type: 'button', class: 'exp-item', title: TITLES[kind] ?? '', onClick: () => { this.exportMenu.classList.add('hidden'); this.onExport(kind); } }, h('span', { text: title }), h('em', { text: ext })) as HTMLButtonElement; this.exportBtns.set(kind, b); return b; }));
     this.exportBtn = h('button', { type: 'button', class: 'ui-btn export-btn', onClick: () => this.exportMenu.classList.toggle('hidden') }) as HTMLButtonElement;
     this.exportBtn.innerHTML = icon('download', 15) + '<span>Export</span>' + icon('chevronUp', 12);

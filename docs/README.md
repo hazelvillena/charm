@@ -6,3 +6,4 @@ Start with [CONTEXT.md](CONTEXT.md). Project overview and run commands: [../READ
 - [adr/](adr/README.md): architecture decisions
 - [DEMO.md](DEMO.md): demo script
 - [HANDOFF.md](HANDOFF.md): original engineering spec (PLAN.md overrides it where they differ; see PLAN section 10)
+- [research/](research/README.md): findings sent over from Claude chat sessions

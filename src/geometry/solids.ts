@@ -1,9 +1,12 @@
 import { getManifold, ManifoldApi } from './kernel';
+import type { Manifold } from 'manifold-3d';
 import { triangulate } from './mesh';
 import { Params } from '../params/schema';
 import { CORE, floorThickness, seatRadius } from '../params/core';
-import { Placement, eyeShapes } from './features';
+import { Placement, eyeShapes, engraveShapes, loopSlot } from './features';
 import { coreProfile } from './coreProfile';
+import { PRINT } from '../params/print';
+import { stadium, closureSpots, layoutFlat } from './printParts';
 
 export type MeshOut = { positions: Float32Array; tris: Uint32Array };
 /** The casing cut open at x = 0 (keeps x <= 0): real solids, so the cut faces are true section faces. */
@@ -16,6 +19,8 @@ export type Casing = {
   outerVolume: number; frontVolume: number; backVolume: number; shellVolume: number;
   /** the rest of the hardware as closed solids, so every export carries the whole assembly */
   parts: { core: MeshOut; magnets: MeshOut[]; eyes: MeshOut[] };
+  /** 3D-print prototype only (`print: true`): the parts laid flat on a plate, ready for one STL */
+  print?: { parts: { name: string; mesh: MeshOut }[]; rimMagnets: number };
   seat: { x: number; y: number; zFront: number; zFloor: number; radius: number };
   magnets: { x: number; y: number; z: number }[];
   splitOffset: number;
@@ -52,6 +57,8 @@ function extract(m: { getMesh(): { numProp: number; vertProperties: Float32Array
  */
 export async function buildCasing(input: {
   outerPos: Float32Array; innerPos: Float32Array; faces: Uint32Array; params: Params; place: Placement; section?: boolean;
+  /** build the print prototype: half-lap seam, rim magnet pockets, engraved eyes, flat layout */
+  print?: boolean;
 }): Promise<Casing> {
   const t0 = performance.now();
   const api = await getManifold();
@@ -69,10 +76,57 @@ export async function buildCasing(input: {
     if (!place.puck) throw new AcceptError('features', new Error('core not placed'));
     const outer = run('outer solid', () => toManifold(api, input.outerPos, input.faces, track));
     const inner = run('inner solid', () => toManifold(api, input.innerPos, input.faces, track));
-    let shell = run('hollow shell', () => track(outer.subtract(inner)));
-
     const cx = 0, cy = place.puck.point.y, zFront = place.puck.point.z;
     const sr = seatRadius(), zFloor = zFront - CORE.puckDepth, floorT = floorThickness();
+    const splitOffset = p.splitZ * p.depth;
+    const print = !!input.print;
+    const C = api.CrossSection;
+    // Extra material (the rim band, magnet bosses, the loop lug) is made by filling parts of the empty inside before the hollow is cut,
+    // so it never has to be fused to the outer surface (fusing faces that coincide leaves sliver edges that slicers reject).
+    const fills: { delete(): void }[] = [];
+    // print prototype: a thicker rim band around the seam holds the half-lap joint
+    const T = p.wall + PRINT.rimExtra, lc = PRINT.lapClearance, L = PRINT.lapHeight, H = L + lc + 1;
+    const seam = print ? track(outer.slice(splitOffset)) : null;
+    // the rim features keep out of the seat cup (its wall is solid anyway)
+    const cupDisc = print ? track(C.circle(sr + p.wall - 0.3, 72).translate([cx, cy])) : null;
+    const pockets: { delete(): void }[] = []; // rim magnet pockets, cut from the finished shell
+    const keepOut: { delete(): void }[] = []; // cutters the half-lap must stay clear of
+    let rimMagnets = 0;
+    if (print) run('rim band', () => {
+      // back half: the full band. Front half: only the outer half of the band up to the rebate's ceiling, then the full band above it
+      // (so the rebate is simply left empty: nothing has to be cut out of the front afterwards)
+      const full = track(track(seam!.subtract(track(seam!.offset(-T, 'Round')))).subtract(cupDisc!));
+      const outerHalf = track(track(seam!.subtract(track(seam!.offset(-(T / 2 - lc / 2), 'Round')))).subtract(cupDisc!));
+      const prism = (cs: typeof full, z0: number, z1: number) => track(track(cs.extrude(z1 - z0)).translate([0, 0, splitOffset + z0]));
+      fills.push(prism(full, -H, 0), prism(outerHalf, 0, H), prism(full, L + lc, H));
+      keepOut.push(track(M.cylinder(zFront + PUCK_HEAD - zFloor, sr, sr, 72, false).translate([cx, cy, zFloor])));
+      keepOut.push(track(M.cube([CORE.notch.width, CORE.notch.depth + 0.6, zFront + PUCK_HEAD - zFloor], false).translate([cx - CORE.notch.width / 2, cy - sr - CORE.notch.depth, zFloor])));
+    });
+    // print prototype: closure magnets (one pair of 5x2 mm discs per spot) sit in bosses on the seam, outside the rim band
+    if (print) run('rim magnets', () => {
+      const rm = PRINT.rimMagnet, pr = rm.diameter / 2 + rm.clearance, pd = rm.thickness + 0.1; // pocket radius, depth each side of the seam
+      const room = track(track(seam!.offset(-(T + rm.margin + pr), 'Round')).subtract(track(C.circle(sr + CORE.notch.depth + pr + 0.4, 72).translate([cx, cy]))));
+      for (const sp of closureSpots(room, pr + 1)) {
+        const bossH = 2 * (pd + rm.boss);
+        fills.push(track(M.cylinder(bossH, pr + rm.boss, pr + rm.boss, 48, true).translate([sp.x, sp.y, splitOffset])));
+        pockets.push(track(M.cylinder(2 * pd, pr, pr, 40, true).translate([sp.x, sp.y, splitOffset])));
+        keepOut.push(track(M.cylinder(bossH + 2, pr + 0.3, pr + 0.3, 40, true).translate([sp.x, sp.y, splitOffset])));
+        rimMagnets += 2;
+      }
+    });
+    // the thread loop: a rounded slot through a lug that melts into the shell (never sticks out past the body)
+    let slotCut: Manifold | null = null;
+    if (place.loop) run('loop slot', () => {
+      const c = place.loop!.center, d = place.loop!.outward, ls = loopSlot(), bh = CORE.loop.minThickness + 1;
+      const ang = (Math.atan2(d.y, d.x) * 180) / Math.PI - 90; // long side of the slot runs along the edge
+      const slot = track(track(stadium(api, track, ls.length, ls.width).rotate(ang)).translate([c.x, c.y]));
+      fills.push(track(track(slot.offset(ls.boss, 'Round', 2, 48)).extrude(bh, 0, 0, 1, true).translate([0, 0, c.z])));
+      slotCut = track(track(slot.extrude(bh + 20, 0, 0, 1, true)).translate([0, 0, c.z]));
+      if (print) keepOut.push(slotCut);
+    });
+    let shell = run('hollow shell', () => track(outer.subtract(fills.length ? track(inner.subtract(track(M.union(fills as any[])))) : inner)));
+    if (pockets.length) shell = run('rim pockets', () => track(shell.subtract(track(M.union(pockets as any[])))));
+    if (slotCut) { const cut = slotCut as Manifold; shell = run('loop slot cut', () => track(shell.subtract(cut))); }
 
     // seat cup: solid wall + floor around the puck, clipped to the outer envelope, then the seat is cut out
     shell = run('puck seat', () => {
@@ -106,15 +160,6 @@ export async function buildCasing(input: {
       return track(shell.subtract(box));
     });
 
-    if (place.loop) shell = run('loop nook', () => {
-      const c = place.loop!.center, hr = CORE.loop.holeDiameter / 2, br = hr + CORE.loop.boss, bh = CORE.loop.minThickness + 1;
-      const boss = track(M.cylinder(bh, br, br, 48, false).translate([c.x, c.y, c.z - bh / 2]));
-      const bossIn = track(M.intersection(boss, outer)); // never sticks out past the body surface
-      const withBoss = track(M.union(shell, bossIn));
-      const hole = track(M.cylinder(bh + 20, hr, hr, 36, false).translate([c.x, c.y, c.z - (bh + 20) / 2]));
-      return track(withBoss.subtract(hole));
-    });
-
     let section: SectionData | undefined;
     if (input.section) {
       section = run('section cut', () => {
@@ -146,7 +191,6 @@ export async function buildCasing(input: {
       return { core: extract(core), magnets: mags.map(extract), eyes: eyes.map(extract) };
     });
 
-    const splitOffset = p.splitZ * p.depth;
     const [frontM, backM] = run('split front/back', () => {
       const [a, b] = shell.splitByPlane([0, 0, 1], splitOffset);
       track(a); track(b);
@@ -154,12 +198,42 @@ export async function buildCasing(input: {
       return [a, b] as const;
     });
 
+    // print prototype: half-lap seam (back shell's inner half reaches into a rebate in the front shell), engraved eyes, flat layout
+    let printOut: Casing['print'];
+    let frontF = frontM, backF = backM;
+    if (print) {
+      const lapped = run('half-lap seam', () => {
+        const keep = track(M.union(keepOut as any));
+        // the lap stays inside the cavity as it is at the lap's full height (where it is narrowest), so a steep wall never runs into it
+        const reach = track(track(inner.slice(splitOffset + L + lc)).offset(-lc, 'Round'));
+        const ring = track(track(track(seam!.offset(-(T / 2 + lc / 2), 'Round').subtract(track(seam!.offset(-(T - PRINT.lapInset), 'Round')))).subtract(cupDisc!)));
+        const lap = track(track(track(ring.intersect(reach)).extrude(L + 0.2)).translate([0, 0, splitOffset - 0.2]));
+        const back2 = track(M.union(backM, track(lap.subtract(keep))));
+        return [frontM, back2] as const;
+      });
+      frontF = lapped[0]; backF = lapped[1];
+      frontF = run('engrave eyes', () => {
+        const cuts = engraveShapes(place, p, PRINT.engraveDepth).map((e) => {
+          const mat = [e.x.x, e.x.y, e.x.z, 0, e.y.x, e.y.y, e.y.z, 0, e.z.x, e.z.y, e.z.z, 0, e.c.x, e.c.y, e.c.z, 1];
+          return track(track(track(M.sphere(1, 28)).scale([e.rx, e.ry, e.rz])).transform(mat as any));
+        });
+        return cuts.length ? track(frontF.subtract(track(M.union(cuts)))) : frontF;
+      });
+      // tidy for slicers: merge near-coplanar facets and collapse sliver edges (0.01 mm), which also cuts the file size
+      frontF = run('tidy front', () => track(frontF.simplify(PRINT.tidy)));
+      backF = run('tidy back', () => track(backF.simplify(PRINT.tidy)));
+      printOut = run('print layout', () => ({
+        parts: layoutFlat([{ name: 'Front shell', mesh: extract(frontF) }, { name: 'Back shell', mesh: extract(backF), flip: true }, { name: 'Core (fit dummy)', mesh: parts.core }], PRINT.gap),
+        rimMagnets,
+      }));
+    }
+
     const out = run('collect meshes', () => ({
-      front: extract(frontM), back: extract(backM),
-      outerVolume: outer.volume(), frontVolume: frontM.volume(), backVolume: backM.volume(),
+      front: extract(frontF), back: extract(backF),
+      outerVolume: outer.volume(), frontVolume: frontF.volume(), backVolume: backF.volume(),
     }));
     return {
-      ...out, parts, section, shellVolume: out.frontVolume + out.backVolume,
+      ...out, parts, section, print: printOut, shellVolume: out.frontVolume + out.backVolume,
       seat: { x: cx, y: cy, zFront, zFloor, radius: sr }, magnets, splitOffset,
       ms: performance.now() - t0, steps,
     };

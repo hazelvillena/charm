@@ -172,7 +172,7 @@ export const CORE = {
   puckCenterY: 0.38,  // fraction of height from bottom, adjustable later
   magnet: { diameter: 6, thickness: 2, count: 2, spacing: 16 }, // TBD
   notch: { width: 3, depth: 1.5 },   // TBD, at bottom of puck seat for fingernail release
-  loop: { holeDiameter: 4, boss: 3 } // TBD
+  loop: { holeWidth: 3, holeLength: 7, boss: 2.2 } // TBD (a rounded thread slot)
 };
 ```
 
