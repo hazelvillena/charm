@@ -323,7 +323,7 @@ function runChecks() {
     draftArr = draftAngles(pos, nor, s.params.splitZ * s.params.depth);
     results.draft = checkDraft(draftArr, s.params.splitZ * s.params.depth, buf2);
     radiiArr = curvatureRadii(pos, nor, engine.smoothFaces(2));
-    if (place.loop) results.nook = checkNook(view.bvh(3), view.geometry(3), place);
+    results.nook = checkNook(view.bvh(3), view.geometry(3), place);
   } catch (e) { console.error(e); results.fit = results.fit ?? { id: 'fit', ok: false, label: 'Checks', detail: 'A check failed to run' }; }
   const list = ['fit', 'wall', 'draft', 'nook'].map((k) => results[k]).filter(Boolean);
   checks = list;
@@ -410,7 +410,7 @@ panel.onParam = (id, value, final) => {
     panel.setLook(store.state.look); view.setLook(store.state.look); updateHash();
   }
   if (id === 'wall') editor.set(store.state.outline, store.state.params.wall);
-  if (!final || id === 'eyeType' || id === 'nookPos' || id === 'material') outputs.setChecks(checks, true);
+  if (!final || id === 'eyeType' || id === 'material') outputs.setChecks(checks, true);
   if ((GLOBAL_PARAM_KEYS as readonly string[]).includes(id)) scheduleLibraryRefresh(); else markEdited();
   markDirty();
   if (final) commit();

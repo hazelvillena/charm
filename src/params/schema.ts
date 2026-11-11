@@ -12,7 +12,6 @@ export type ParamDef = {
 export type Params = {
   depth: number; belly: number; backFlat: number; plateau: number; corePlateau: boolean;
   eyes: 'two' | 'one' | 'none'; eyeSize: number; eyeSpacing: number; eyeHeight: number; eyeType: 'inset' | 'raised' | 'flush';
-  loop: boolean; nookPos: 'top' | 'top-left' | 'top-right';
   wall: number; splitZ: number; material: MaterialId;
   side: SideProfile;
 };
@@ -35,8 +34,6 @@ export const SCHEMA: ParamDef[] = [
   { id: 'eyeSpacing', label: 'Eye spacing', group: 'face', kind: 'range', min: 3, max: 12, step: 0.5, default: 5.5, unit: 'mm' },
   { id: 'eyeHeight', label: 'Eye height', group: 'face', kind: 'range', min: 0.55, max: 0.92, step: 0.005, default: 0.78 },
   { id: 'eyeType', label: 'Eye type', group: 'face', kind: 'enum', options: ['inset', 'raised', 'flush'], default: 'inset' },
-  { id: 'loop', label: 'Loop', group: 'attach', kind: 'toggle', default: false },
-  { id: 'nookPos', label: 'Loop position', group: 'attach', kind: 'enum', options: ['top', 'top-left', 'top-right'], default: 'top' },
   { id: 'wall', label: 'Wall thickness', group: 'mfg', kind: 'range', min: 1.2, max: 2.5, step: 0.1, default: 1.6, unit: 'mm' },
   { id: 'splitZ', label: 'Split line', group: 'mfg', kind: 'range', min: -0.5, max: 0.5, step: 0.05, default: 0 },
   { id: 'material', label: 'Material', group: 'look', kind: 'enum', options: MATERIALS.map((m) => m.id), default: 'PC/ABS' },

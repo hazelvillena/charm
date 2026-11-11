@@ -45,7 +45,7 @@ export function evaluateIteration(engine: ShapeEngine, outlineIn: Outline, param
     } else checks.push({ id: 'wall', ok: false, label: 'Wall', detail: 'Inner shell could not be built' });
     const nor = g.attributes.normal.array as Float32Array, sz = params.splitZ * params.depth;
     checks.push(checkDraft(draftAngles(pos, nor, sz), sz, pos));
-    if (place.loop) checks.push(checkNook(bvh, g, place));
+    checks.push(checkNook(bvh, g, place));
   } catch { checks.push({ id: 'fit', ok: false, label: 'Checks', detail: 'A check failed to run' }); }
   g.dispose();
   const failing = checks.filter((c) => !c.ok).map((c) => c.label);

@@ -1,7 +1,7 @@
 import { Ray, Vector3, Triangle, BufferGeometry, DoubleSide, FrontSide, Side } from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { Params } from '../params/schema';
-import { CORE, seatRadius } from '../params/core';
+import { CORE, seatRadius, floorThickness } from '../params/core';
 
 export type SurfaceHit = { point: Vector3; normal: Vector3 };
 
@@ -25,7 +25,8 @@ export type Placement = {
   eyes: (SurfaceHit | null)[];
   puck: SurfaceHit | null;       // front surface at the puck center
   backZ: number | null;          // back surface z at the puck center
-  loop: { center: Vector3; outward: Vector3 } | null;
+  /** the strap tunnel on the back: two slot openings (surface points) joined by a channel inside; z0..z1 is the channel's height */
+  strap: { yc: number; center: Vector3; openings: Vector3[]; z0: number; z1: number } | null;
 };
 
 /** margin (mm) kept between the core seat wall and an eye */
@@ -34,18 +35,47 @@ export const EYE_CORE_MARGIN = 1.5;
 /** smallest distance from the core centre at which an eye of this size may sit (seat + wall + margin + the eye's own half height) */
 export function eyeClearance(p: Params): number { return seatRadius() + p.wall + EYE_CORE_MARGIN + 0.8 * p.eyeSize; }
 
-/** the loop sits toward the back half, so it is on the top edge but not on the very tip */
-export const LOOP_BACK = 0.25; // fraction of the depth behind the mid plane
-/** loop centre sits this far inside the outline: the slot's half width plus a firm bridge of plastic */
-export const loopInset = () => CORE.loop.holeWidth / 2 + 1.6;
-
-export function loopDir(pos: Params['nookPos']) {
-  const deg = pos === 'top' ? 90 : pos === 'top-left' ? 112 : 68;
-  const r = (deg * Math.PI) / 180;
-  return new Vector3(Math.cos(r), Math.sin(r), 0);
+/** the strap tunnel's opening: a slot (pill) `w` wide along x and `h` tall along y, as a polygon centred on the origin. One definition for the viewport and the solids. */
+export function strapPill(w: number, h: number, seg = 16): [number, number][] {
+  const r = h / 2, a = Math.max(0, w / 2 - r), pts: [number, number][] = [];
+  for (let i = 0; i <= seg; i++) { const t = -Math.PI / 2 + (Math.PI * i) / seg; pts.push([a + r * Math.cos(t), r * Math.sin(t)]); }
+  for (let i = 0; i <= seg; i++) { const t = Math.PI / 2 + (Math.PI * i) / seg; pts.push([-a + r * Math.cos(t), r * Math.sin(t)]); }
+  return pts;
 }
 
-/** Places eyes, puck and loop on the smooth surface. Call after the BVH was refit for the current positions. */
+/**
+ * Finds where the strap tunnel fits: on the back, on the centre line, as high up as it can go. It needs the back surface at both openings,
+ * then a bar of plastic, the channel, and a floor, all before the seam (so it lives in the back shell), clear of the Core seat and the body's rim.
+ * Adapts to any shape; null when there is no room (the sanity check then says so).
+ */
+export function findStrap(bvh: MeshBVH, geo: BufferGeometry, p: Params, shiftY: number, puckZ: number | null): Placement['strap'] {
+  const S = CORE.strap, seam = p.splitZ * p.depth, hw = S.openingWidth / 2, hh = S.openingHeight / 2;
+  const xs = [-S.spacing / 2, S.spacing / 2], reachX = S.spacing / 2 + hw + S.padMargin;
+  geo.computeBoundingBox(); const top = geo.boundingBox!.max.y;
+  const backAt = (x: number, y: number) => { const h = castSurface(bvh, geo, new Vector3(x, y, -300), new Vector3(0, 0, 1)); return h ? h.point.z : null; };
+  // the Core's seat and its magnet pockets only reach into the back shell on deep seats; when they do, keep the tunnel clear of the seat's wall
+  const seatBottom = puckZ === null ? -Infinity : puckZ - CORE.puckDepth - floorThickness() - 0.4;
+  const seatMin = seatBottom > seam ? -Infinity : shiftY + seatRadius() + p.wall + 1 + hh + S.padMargin;
+  const yMin = Math.max(seatMin, geo.boundingBox!.min.y + hh + S.padMargin); // never search below the body itself (an unbounded search would never end)
+  for (let yc = top - 1; yc >= yMin; yc -= 0.5) {
+    // cheap first look (one ray): up near the top the back curves away, so most heights fail the depth test right here (this runs on every drag frame)
+    const zMid = backAt(0, yc);
+    if (zMid === null || zMid + S.bar + S.channelHeight + S.floor - 2 > seam) continue;
+    // the back surface at the openings' corners and centres, and a little beyond them (the pad around the tunnel must stay on the body)
+    let zb = -Infinity, ok = true;
+    for (const x of [-reachX, xs[0] - hw, xs[0], xs[1], xs[1] + hw, reachX]) for (const y of [yc - hh - S.padMargin, yc - hh, yc, yc + hh, yc + hh + S.rimMargin]) {
+      const z = backAt(x, y); if (z === null) { ok = false; break; }
+      if (Math.abs(y - yc) <= hh && Math.abs(x) <= xs[1] + hw) zb = Math.max(zb, z);
+    }
+    if (!ok) continue;
+    const z0 = zb + S.bar, z1 = z0 + S.channelHeight;
+    if (z1 + S.floor > seam) continue; // not enough body behind the seam here: try lower
+    return { yc, center: new Vector3(0, yc, zb), openings: xs.map((x) => new Vector3(x, yc, backAt(x, yc) ?? zb)), z0, z1 };
+  }
+  return null;
+}
+
+/** Places eyes, puck and the strap tunnel on the smooth surface. Call after the BVH was refit for the current positions. */
 export function placeFeatures(bvh: MeshBVH, geo: BufferGeometry, p: Params, shiftY: number, height: number): Placement {
   const dn = new Vector3(0, 0, -1);
   // eyes never sit on the core: if the requested height would put them inside the clearance zone they slide up above it
@@ -61,14 +91,9 @@ export function placeFeatures(bvh: MeshBVH, geo: BufferGeometry, p: Params, shif
   });
   const puck = castSurface(bvh, geo, new Vector3(0, shiftY, 300), dn);
   const back = castSurface(bvh, geo, new Vector3(0, shiftY, -300), new Vector3(0, 0, 1));
-  const d = loopDir(p.nookPos);
-  const h = castSurface(bvh, geo, new Vector3(0, shiftY, -LOOP_BACK * p.depth), d, DoubleSide);
-  const loop = p.loop !== false && h ? { center: h.point.clone().addScaledVector(d, -loopInset()), outward: d } : null; // the loop is optional
-  return { eyes, puck, backZ: back ? back.point.z : null, loop };
+  const strap = findStrap(bvh, geo, p, shiftY, puck ? puck.point.z : null);
+  return { eyes, puck, backZ: back ? back.point.z : null, strap };
 }
-
-/** the thread slot (a stadium: length along the edge, width across it) and the lug around it */
-export const loopSlot = () => ({ length: CORE.loop.holeLength, width: CORE.loop.holeWidth, boss: CORE.loop.boss });
 
 export type V3 = { x: number; y: number; z: number };
 /** a right-handed frame whose z axis is `n` (the surface normal), x kept roughly horizontal */

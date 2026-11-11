@@ -119,7 +119,7 @@ export class Panel {
   }
 
   /** the plateau slider only matters while the flat core seat is on */
-  private dimDependents(id: string, on: boolean) { if (id === 'corePlateau') this.fields.get('plateau')?.classList.toggle('dim', !on); if (id === 'loop') this.fields.get('nookPos')?.classList.toggle('dim', !on); }
+  private dimDependents(id: string, on: boolean) { if (id === 'corePlateau') this.fields.get('plateau')?.classList.toggle('dim', !on); }
   /** the eye controls only matter for the eyes that exist */
   private dimEyes(mode: string) { for (const k of ['eyeSize', 'eyeHeight', 'eyeType']) this.fields.get(k)?.classList.toggle('dim', mode === 'none'); this.fields.get('eyeSpacing')?.classList.toggle('dim', mode !== 'two'); }
 

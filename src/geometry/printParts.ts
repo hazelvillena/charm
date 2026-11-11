@@ -4,13 +4,6 @@ import type { MeshOut } from './solids';
 type Track = <T extends { delete(): void }>(x: T) => T;
 type CS = InstanceType<ManifoldApi['CrossSection']>;
 
-/** A rounded slot (stadium): `length` along x, `width` along y, centred on the origin. */
-export function stadium(api: ManifoldApi, track: Track, length: number, width: number): CS {
-  const r = width / 2, a = Math.max(0, length / 2 - r), C = api.CrossSection;
-  if (a === 0) return track(C.circle(r, 40));
-  return track(C.hull([track(C.circle(r, 40).translate([-a, 0])), track(C.circle(r, 40).translate([a, 0]))]));
-}
-
 /** x of the right-most edge of a region on the horizontal line y (null when the region does not reach it) */
 function rightmost(polys: ReadonlyArray<ReadonlyArray<ArrayLike<number>>>, y: number): number | null {
   let best: number | null = null;

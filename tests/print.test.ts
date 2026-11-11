@@ -16,10 +16,11 @@ const bbox = (m: { positions: Float32Array }) => {
   return { lo, hi };
 };
 
-async function build(presetIx: number, patch: Record<string, unknown>, print: boolean) {
+async function build(presetIx: number, patch: Record<string, unknown>, print: boolean, strap = true) {
   const pr = PRESETS[presetIx], params = { ...presetParams(pr), ...patch } as any;
   const a = buildAll(clampOutline(pr.outline, params.wall), params, 3);
-  return { casing: await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params, place: a.place, print }), place: a.place, params };
+  const place = strap ? a.place : { ...a.place, strap: null }; // `strap: false` builds the same shape without the strap hole, to compare against
+  return { casing: await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params, place, print }), place, params };
 }
 
 describe('3D print prototype export', () => {
@@ -61,16 +62,25 @@ describe('3D print prototype export', () => {
     console.log('rim magnets', casing.print!.rimMagnets, 'front cm3', (casing.frontVolume / 1000).toFixed(2), 'back cm3', (casing.backVolume / 1000).toFixed(2));
   }, 40000);
 
-  it('loop is a rounded slot built into the shell, near the top but off the tip', async () => {
-    const { casing, place, params } = await build(0, { loop: true }, true);
+  for (let ix = 0; ix < PRESETS.length; ix++) it(`${PRESETS[ix].id}: strap tunnel — a cord runs down one opening, under the bar and up the other; the bar and the outline are intact`, async () => {
+    const { casing, place } = await build(ix, {}, true);
+    expect(place.strap).not.toBeNull();
+    const st = place.strap!, S = CORE.strap, api = await getManifold(), M = api.Manifold;
+    expect(st.z1 + S.floor).toBeLessThanOrEqual(casing.splitOffset + 1e-6); // the whole tunnel sits in the back shell
     for (const x of casing.print!.parts) expect(weldedProblems(x.mesh), x.name).toEqual({ open: 0, flipped: 0 });
-    expect(place.loop).not.toBeNull();
-    const c = place.loop!.center;
-    expect(c.z).toBeLessThan(0); // toward the back half
-    expect(casing.front.tris.length).toBeGreaterThan(0); expect(casing.back.tris.length).toBeGreaterThan(0);
-    const plain = await build(0, { loop: false }, true);
-    expect(casing.shellVolume).not.toBeCloseTo(plain.casing.shellVolume, 0);
-    expect(params.loop).toBe(true);
+    const back = new api.Manifold(new api.Mesh({ numProp: 3, vertProperties: casing.back.positions.slice(), triVerts: casing.back.tris.slice() }));
+    const zc = (st.z0 + st.z1) / 2, r = Math.min(S.openingHeight, S.channelHeight) / 2 - 0.3;
+    const cyl = (len: number, at: [number, number, number], rot: [number, number, number]) => M.cylinder(len, r, r, 24, true).rotate(rot).translate(at);
+    // the cord: straight down into each opening, and along the channel between them
+    const cord = M.union([cyl(400, [-S.spacing / 2, st.yc, st.z0 - 200 + 1], [0, 0, 0]), cyl(400, [S.spacing / 2, st.yc, st.z0 - 200 + 1], [0, 0, 0]), cyl(S.spacing, [0, st.yc, zc], [0, 90, 0])]);
+    expect(back.intersect(cord).volume()).toBeLessThan(0.5); // nothing blocks the cord's path
+    const bar = M.cube([1, 1, 1], true).translate([0, st.yc, st.z0 - S.bar / 2]);
+    expect(back.intersect(bar).volume()).toBeGreaterThan(0.9); // the bar the cord wraps around is solid
+    const floor = M.cube([1, 1, 1], true).translate([0, st.yc, st.z1 + S.floor / 2]);
+    expect(back.intersect(floor).volume()).toBeGreaterThan(0.9); // and so is the floor under the channel
+    // nothing sticks out: the strap tunnel is inside the body
+    const plain = await build(ix, {}, true, false);
+    expect(bbox(casing.back).hi[1]).toBeCloseTo(bbox(plain.casing.back).hi[1], 1);
   }, 40000);
 });
 
@@ -90,13 +100,21 @@ describe('print prototype across the built-in shapes', () => {
 });
 
 describe('every STL output is watertight for slicers (root guard for all exports)', () => {
-  for (let ix = 0; ix < PRESETS.length; ix++) for (const loop of [false, true]) {
+  for (let ix = 0; ix < PRESETS.length; ix++) for (const loop of [false, true]) { // false = built without the strap hole (a comparison), true = as the app builds it
     it(`${PRESETS[ix].id}${loop ? ' with loop' : ''}: shells, parts and print layout`, async () => {
       for (const print of [false, true]) {
-        const { casing } = await build(ix, { loop }, print);
+        const { casing } = await build(ix, {}, print, loop);
         const meshes = [['front', casing.front], ['back', casing.back], ['core', casing.parts.core], ...casing.parts.magnets.map((m, i) => [`magnet ${i}`, m] as const), ...casing.parts.eyes.map((m, i) => [`eye ${i}`, m] as const), ...(casing.print?.parts ?? []).map((x) => [x.name, x.mesh] as const)] as const;
         for (const [name, m] of meshes) expect(meshHealth(m), `${PRESETS[ix].id} ${loop ? 'loop ' : ''}${print ? 'print ' : ''}${name}`).toEqual({ open: 0, flipped: 0 });
       }
     }, 60000);
   }
+});
+
+describe('strap tunnel search always ends', () => {
+  it('a body too shallow for the tunnel gets none (and the sanity check says so) instead of searching forever', () => {
+    const pr = PRESETS[0], params = { ...presetParams(pr), depth: 12, splitZ: 0 } as any;
+    const a = buildAll(clampOutline(pr.outline, params.wall), params, 2);
+    expect(a.place.strap).toBeNull();
+  }, 15000);
 });

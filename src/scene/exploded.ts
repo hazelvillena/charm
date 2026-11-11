@@ -56,7 +56,7 @@ export class ExplodedView {
       front.add(m);
     });
     const fl = label('Front shell'); fl.position.set(size.w / 2 + 4, size.h * 0.1, casing.seat.zFront * 0.4); front.add(fl);
-    if (place.loop) { const ll = label('Loop'); ll.position.copy(place.loop.center).add(new Vector3(0, 7, 0)); front.add(ll); }
+    if (place.strap) { const ll = label('Strap hole'); ll.position.copy(place.strap.center).add(new Vector3(0, 7, 0)); front.add(ll); }
     add('front', front);
 
     const mags = new Group();

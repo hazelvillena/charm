@@ -1,7 +1,7 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, PMREMGenerator, Group, Mesh, BufferGeometry, Float32BufferAttribute,
   Uint32BufferAttribute, MeshPhysicalMaterial, MeshBasicMaterial, LineSegments, LineBasicMaterial, Points, PointsMaterial,
-  CylinderGeometry, SphereGeometry, Shape, Path, ExtrudeGeometry, Vector3, Quaternion, DirectionalLight, HemisphereLight, CanvasTexture,
+  CylinderGeometry, SphereGeometry, Shape, ExtrudeGeometry, Vector3, Quaternion, DirectionalLight, HemisphereLight, CanvasTexture,
   PlaneGeometry, NeutralToneMapping, DoubleSide, FrontSide, Object3D, Material, Plane, ShaderMaterial,
   MeshLambertMaterial, Sprite, SpriteMaterial,
 } from 'three';
@@ -9,7 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MeshBVH } from 'three-mesh-bvh';
 import { triangulate } from '../geometry/mesh';
-import { Placement, loopSlot } from '../geometry/features';
+import { Placement, strapPill } from '../geometry/features';
 import { CORE } from '../params/core';
 import { Params } from '../params/schema';
 import { Look, finishById, DEFAULT_LOOK } from '../../design/finishes';
@@ -41,8 +41,7 @@ export class SceneView {
   readonly eyeMat = new MeshPhysicalMaterial({ color: 0x15151b, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 });
   private eyes: Mesh[] = [];
   private puck: Group;
-  private loopMesh: Mesh;
-  private loopMat: MeshPhysicalMaterial;
+  private strapMarks: Group;
   private innerMesh: Mesh;
   private innerMat: MeshPhysicalMaterial;
   private magnets = new Group();
@@ -122,9 +121,9 @@ export class SceneView {
     for (let i = 0; i < 2; i++) { const m = new Mesh(new SphereGeometry(1, 24, 16), this.eyeMat); m.visible = false; this.eyes.push(m); this.root.add(m); }
     this.puck = makePuck(); this.puck.visible = false;
     this.root.add(this.puck);
-    this.loopMat = this.shellMat.clone();
-    this.loopMesh = new Mesh(loopLugGeometry(), this.loopMat);
-    this.loopMesh.visible = false; this.root.add(this.loopMesh);
+    this.strapMarks = new Group(); // the two strap openings on the back, drawn as dark slots
+    for (let i = 0; i < 2; i++) this.strapMarks.add(new Mesh(strapMarkGeometry(), new MeshBasicMaterial({ color: 0x1a1a22 })));
+    this.strapMarks.visible = false; this.root.add(this.strapMarks);
 
     // inner shell (ghost + section views), magnets, section lines, zebra material
     const f2 = faces[2]; const v2 = maxIndex(f2) + 1;
@@ -205,7 +204,7 @@ export class SceneView {
       m.quaternion.copy(q);
       m.scale.set(rx, ry, rz);
     });
-    this.puckWanted = !!pl.puck; this.loopWanted = !!pl.loop;
+    this.puckWanted = !!pl.puck; this.loopWanted = !!pl.strap;
     const hideForSection = this.viewMode === 'section' && this.sectionReady;
     if (pl.puck) {
       this.puck.visible = !hideForSection;
@@ -217,11 +216,10 @@ export class SceneView {
       const zFloor = pl.puck.point.z - CORE.puckDepth, zc = zFloor - CORE.magnet.gap - CORE.magnet.thickness / 2;
       this.magnets.children.forEach((m, i) => m.position.set(0, pl.puck!.point.y + (i - 0.5) * CORE.magnet.spacing, zc));
     }
-    if (pl.loop) {
-      this.loopMesh.visible = !hideForSection;
-      this.loopMesh.position.copy(pl.loop.center);
-      this.loopMesh.rotation.z = Math.atan2(pl.loop.outward.y, pl.loop.outward.x) - Math.PI / 2; // long side of the slot runs along the edge
-    } else this.loopMesh.visible = false;
+    if (pl.strap) {
+      this.strapMarks.visible = !hideForSection;
+      this.strapMarks.children.forEach((m, i) => m.position.copy(pl.strap!.openings[i]).add(new Vector3(0, 0, -0.1))); // on the back surface, just proud of it
+    } else this.strapMarks.visible = false;
   }
 
   /** rebuild the core mesh after its shape params changed */
@@ -248,13 +246,12 @@ export class SceneView {
     const see = ghost || cage;
     this.shellMat.transparent = see; this.shellMat.opacity = ghost ? 0.2 : cage ? 0.32 : 1; this.shellMat.depthWrite = !see;
     this.shellMat.needsUpdate = true;
-    this.loopMat.transparent = see; this.loopMat.opacity = see ? 0.85 : 1; this.loopMat.needsUpdate = true;
     this.innerMat.needsUpdate = true;
     this.applyMeshMaterial();
   }
   /** the section plane applies to the shell, wall, core, magnets and eyes (not the ground shadow) */
   private applyClip() {
-    for (const m of [this.shellMat, this.innerMat, this.loopMat, this.eyeMat]) m.clippingPlanes = this.clip;
+    for (const m of [this.shellMat, this.innerMat, this.eyeMat]) m.clippingPlanes = this.clip;
     for (const g of [this.puck, this.magnets]) g.traverse((o) => { const mat = (o as Mesh).material as Material | undefined; if (mat) mat.clippingPlanes = this.clip; });
   }
   /** the cut-open casing (real solids with poche) replaces the quick clipped preview once it is ready */
@@ -273,7 +270,7 @@ export class SceneView {
     this.smooth.visible = !ready; this.puck.visible = this.puckWanted && !ready;
     this.innerMesh.visible = (this.viewMode === 'ghost' || section) && !ready;
     this.magnets.visible = (this.viewMode === 'ghost' || section) && !ready;
-    this.loopMesh.visible = this.loopWanted && !ready;
+    this.strapMarks.visible = this.loopWanted && !ready;
     this.sectionOuter.visible = section && !ready; this.sectionInner.visible = section && !ready;
   }
   get mode() { return this.viewMode; }
@@ -304,7 +301,6 @@ export class SceneView {
     this.baseColor.set(look.color);
     const f = finishById(look.finish);
     applyFinish(this.shellMat, f, this.baseColor);
-    applyFinish(this.loopMat, f, this.baseColor);
     this.applyTint();
   }
   setSplit(zMm: number, on: boolean, cy = 0) { splitUniforms.uSplitZ.value = zMm; splitUniforms.uSplitOn.value = on ? 1 : 0; splitUniforms.uSplitCy.value = cy; }
@@ -312,7 +308,6 @@ export class SceneView {
   setInvalidTint(t: number) { this.tint = t; this.applyTint(); }
   private applyTint() {
     this.shellMat.color.copy(this.baseColor).lerp(new Color('#ff6b6b'), this.tint * 0.28);
-    this.loopMat.color.copy(this.shellMat.color); this.loopMat.metalness = this.shellMat.metalness; this.loopMat.roughness = this.shellMat.roughness;
   }
 
   /** heatmap: pass per-vertex colors for the level-2 geometry, or null */
@@ -366,15 +361,9 @@ export class SceneView {
 }
 export { DoubleSide };
 
-/** the loop lug: a rounded slot (stadium) in a stadium-shaped boss, as built into the shell */
-function loopLugGeometry() {
-  const l = loopSlot(), stad = (p: Shape | Path, len: number, w: number, ccw: boolean) => {
-    const r = w / 2, a = len / 2 - r;
-    if (ccw) { p.absarc(a, 0, r, -Math.PI / 2, Math.PI / 2, false); p.absarc(-a, 0, r, Math.PI / 2, Math.PI * 1.5, false); }
-    else { p.absarc(-a, 0, r, Math.PI * 1.5, Math.PI / 2, true); p.absarc(a, 0, r, Math.PI / 2, -Math.PI / 2, true); }
-  };
-  const outer = new Shape(); stad(outer, l.length + 2 * l.boss, l.width + 2 * l.boss, true);
-  const hole = new Path(); stad(hole, l.length, l.width, false); outer.holes.push(hole);
-  const th = CORE.loop.minThickness + 1, g = new ExtrudeGeometry(outer, { depth: th, bevelEnabled: false, curveSegments: 24 });
-  g.translate(0, 0, -th / 2); return g;
+/** one strap opening as a thin dark slot (its own frame, flat on the back surface), the same pill the solids cut */
+function strapMarkGeometry() {
+  const S = CORE.strap, shape = new Shape();
+  strapPill(S.openingWidth, S.openingHeight).forEach(([x, y], i) => (i ? shape.lineTo(x, y) : shape.moveTo(x, y))); shape.closePath();
+  const g = new ExtrudeGeometry(shape, { depth: 0.4, bevelEnabled: false }); g.translate(0, 0, -0.2); return g;
 }

@@ -64,7 +64,7 @@ export class Library {
       if (this.version < 4) { // give built-in iterations that still have the single default material their own
         for (const it of this.items) { const m = SEED_MATERIALS[it.name]; if (m && it.params.material === 'PC/ABS') { it.params.material = m.material; it.look = { ...m.look }; } }
       }
-      if (this.version < 5) for (const it of this.items) if (SEED_MATERIALS[it.name]) it.params.loop = false; // built-ins start without the attachment loop
+      for (const it of this.items) delete (it.params as { loop?: boolean }).loop; // the strap hole is part of every shape now, no longer an option
       if (this.version < 8) for (const it of this.items) { it.thumb = undefined; if (it.look?.finish === 'pearl') it.look = { ...it.look, finish: 'gloss' }; } // pearl is gone; redraw thumbnails // redraw thumbnails with the Core and eyes
       if (this.version < 9) { // Ghost is now Charmer; the round Pebble (too close to Blob) becomes the flat-based Arch
         const arch = starterItems().find((i) => i.name === 'Arch');

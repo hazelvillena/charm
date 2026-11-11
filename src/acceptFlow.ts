@@ -98,11 +98,12 @@ export function setupAccept(ctx: AcceptCtx) {
 
   /** the prototype for a desktop printer: built fresh (half-lap seam, rim magnet pockets, engraved eyes) and laid flat */
   const exportPrint = async () => {
-    const place = ctx.getPlace();
-    if (!place || !ctx.getInfo()) { toast('No valid shape to print yet', 'error'); return; }
     toast('Preparing the print files…');
-    ctx.settleNow();
-    const s = store.state, outerPos = new Float32Array(engine.smoothVertCount(3) * 3); engine.smoothInto(ctx.getCage(), 3, outerPos);
+    ctx.settleNow(); // first: the shape, checks and feature placement must match what is on screen now (not the previous iteration)
+    const place = ctx.getPlace(); // every shape has its strap hole (it is not an option), placed by the same rule as on screen
+    if (!place || !ctx.getInfo()) { toast('No valid shape to print yet', 'error'); return; }
+    const s = store.state;
+    const outerPos = new Float32Array(engine.smoothVertCount(3) * 3); engine.smoothInto(ctx.getCage(), 3, outerPos);
     const innerPos = new Float32Array(engine.smoothVertCount(3) * 3);
     if (!engine.innerSurface(outerPos, 3, s.params.wall, innerPos)) { toast('Print build failed at inner shell', 'error'); return; }
     try {
@@ -110,7 +111,9 @@ export function setupAccept(ctx: AcceptCtx) {
       const name = s.name || 'Custom';
       warnIfLeaky(c.print!.parts.map((x) => [x.name, x.mesh]));
       download(`${name}-3dprint.stl`, mergeStl(c.print!.parts.map((x) => x.mesh), 'clayground 3d print: front shell, back shell, core fit dummy'));
-      toast(`3D print STL saved · front, back, Core dummy · ${c.print!.rimMagnets} rim magnets (5×2 mm)`, 'info', 7000);
+      // say what is in the file, so a missing piece is explained, not a surprise
+      const hole = place.strap ? 'strap tunnel included' : 'no strap tunnel (no room for it on the back)';
+      toast(`3D print STL saved · ${name} · front, back, Core dummy · ${hole} · ${c.print!.rimMagnets} rim magnets (5×2 mm)`, 'info', 9000);
     } catch (e) {
       console.error(e);
       toast(`Print build failed at ${e instanceof AcceptError ? e.step : 'unknown'}`, 'error');

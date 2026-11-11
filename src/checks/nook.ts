@@ -1,18 +1,12 @@
-import { Vector3, BufferGeometry } from 'three';
+import { BufferGeometry } from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { CORE } from '../params/core';
-import { castSurface, Placement } from '../geometry/features';
+import { Placement } from '../geometry/features';
 import { CheckResult } from './fit';
 
-export function checkNook(bvh: MeshBVH, geo: BufferGeometry, place: Placement): CheckResult {
-  if (!place.loop) return { id: 'nook', ok: false, label: 'Loop', detail: 'No surface found for the loop' };
-  const c = place.loop.center;
-  const f = castSurface(bvh, geo, new Vector3(c.x, c.y, 300), new Vector3(0, 0, -1));
-  const b = castSurface(bvh, geo, new Vector3(c.x, c.y, -300), new Vector3(0, 0, 1));
-  if (!f || !b) return { id: 'nook', ok: false, label: 'Loop', detail: 'Loop sits off the body', fix: 'Move the loop onto the body', at: c };
-  const t = f.point.z - b.point.z;
-  const need = CORE.loop.minThickness;
-  return t >= need
-    ? { id: 'nook', ok: true, label: 'Loop', detail: `${t.toFixed(1)} mm of body behind the loop (needs ${need.toFixed(1)} mm)` }
-    : { id: 'nook', ok: false, label: 'Loop', detail: `Only ${t.toFixed(1)} mm of body at the loop; it needs ${need.toFixed(1)} mm to hold`, fix: 'Thicken the body here or move the loop', at: { x: c.x, y: c.y, z: c.z } };
+/** The strap tunnel (two openings on the back joined by a channel inside) needs room behind the back surface. */
+export function checkNook(_bvh: MeshBVH, _geo: BufferGeometry, place: Placement): CheckResult {
+  if (!place.strap) return { id: 'nook', ok: false, label: 'Strap hole', detail: 'No room for the strap tunnel on the back', fix: 'Make the body deeper or taller toward the top back' };
+  const s = CORE.strap;
+  return { id: 'nook', ok: true, label: 'Strap hole', detail: `Cord tunnel on the back: two ${s.openingWidth} × ${s.openingHeight} mm openings, ${s.spacing} mm apart, ${s.bar} mm bar`, at: { x: place.strap.center.x, y: place.strap.center.y, z: place.strap.center.z } };
 }
