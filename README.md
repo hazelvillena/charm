@@ -14,7 +14,7 @@ A browser tool for shaping a **Charmer**: draw a flat outline, get a soft SubD c
 4. Metric tiles (size, estimated weight, volume, split), and **checks** (core fit, magnet gap, wall, mold draft, tightest radius, loop) that go red with the exact reason. On the stage: **Shaded / Ghost / Section / Cage** views, an **Analyze** menu (mold draft, curvature, zebra, wall) and the mold **split line**.
    A **Library** of saved, named iterations stays live when global parameters (core, wall, material, split) change.
 5. **Build casing**: hollow front and back shells (manifold-3d), core seat, magnets sealed behind a thin floor, notch, loop, then an exploded diagram with numbered leader tags.
-6. **Export** (bottom of the right panel): cage OBJ (quads, for Rhino SubD), smooth OBJ, STL shells, **STL · 3D print** (both shells and a Core fit dummy laid flat, with a half-lap seam, 5×2 mm magnet pockets and engraved eyes; ADR 0024), **STEP** (faceted solid for Creo/Rhino, not NURBS), spec JSON. Permalink button top right.
+6. **Export** (bottom of the right panel): cage OBJ (quads, for Rhino SubD), smooth OBJ, STL shells, **STL · 3D print** (both shells and a Core fit dummy laid flat, with a snap-fit half-lap seam, magnet pockets in the Core dummy and engraved eyes; ADR 0024), **STEP** (faceted solid for Creo/Rhino, not NURBS), spec JSON. Permalink button top right.
 
 ## Run
 ```bash

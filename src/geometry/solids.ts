@@ -6,7 +6,7 @@ import { CORE, floorThickness, seatRadius } from '../params/core';
 import { Placement, eyeShapes, engraveShapes, strapPill } from './features';
 import { coreProfile } from './coreProfile';
 import { PRINT } from '../params/print';
-import { closureSpots, layoutFlat } from './printParts';
+import { layoutFlat } from './printParts';
 
 export type MeshOut = { positions: Float32Array; tris: Uint32Array };
 /** The casing cut open at x = 0 (keeps x <= 0): real solids, so the cut faces are true section faces. */
@@ -20,7 +20,7 @@ export type Casing = {
   /** the rest of the hardware as closed solids, so every export carries the whole assembly */
   parts: { core: MeshOut; magnets: MeshOut[]; eyes: MeshOut[] };
   /** 3D-print prototype only (`print: true`): the parts laid flat on a plate, ready for one STL */
-  print?: { parts: { name: string; mesh: MeshOut }[]; rimMagnets: number };
+  print?: { parts: { name: string; mesh: MeshOut }[] };
   seat: { x: number; y: number; zFront: number; zFloor: number; radius: number };
   magnets: { x: number; y: number; z: number }[];
   splitOffset: number;
@@ -89,9 +89,12 @@ export async function buildCasing(input: {
     const seam = print ? track(outer.slice(splitOffset)) : null;
     // the rim features keep out of the seat cup (its wall is solid anyway)
     const cupDisc = print ? track(C.circle(sr + p.wall - 0.3, 72).translate([cx, cy])) : null;
-    const pockets: { delete(): void }[] = []; // rim magnet pockets, cut from the finished shell
     const keepOut: { delete(): void }[] = []; // cutters the half-lap must stay clear of
-    let rimMagnets = 0;
+    // where the lap can go: inside the cavity as it is at the lap's full depth (the narrowest), so a steep or rolled-over wall never runs into it.
+    // The rebate in the back shell is only cut where the lap goes; where the shell is too shallow for the joint the seam stays a flat, wide band
+    const reach = print ? track(track(inner.slice(splitOffset - L - lc)).offset(-lc, 'Round')) : null;
+    const lapRing = print ? track(track(seam!.offset(-(T / 2 + lc / 2), 'Round').subtract(track(seam!.offset(-(T - PRINT.lapInset), 'Round')))).subtract(cupDisc!)) : null;
+    const lapCross = print ? track(lapRing!.intersect(reach!)) : null;
     if (print) run('rim band', () => {
       // front half: the full band. Back half: only the outer half of the band down to the rebate's floor, then the full band below it
       // (so the rebate is simply left empty: nothing has to be cut out afterwards). The front shell carries the lap, so the back shell's
@@ -100,20 +103,12 @@ export async function buildCasing(input: {
       const outerHalf = track(track(seam!.subtract(track(seam!.offset(-(T / 2 - lc / 2), 'Round')))).subtract(cupDisc!));
       const prism = (cs: typeof full, z0: number, z1: number) => track(track(cs.extrude(z1 - z0)).translate([0, 0, splitOffset + z0]));
       fills.push(prism(full, 0, H), prism(outerHalf, -H, 0), prism(full, -H, -(L + lc)));
+      // shallow stretches (feet, tips): no rebate, the band is solid up to the seam. The pocket zone is the lap's footprint grown by the clearance and a little more
+      const pocket = track(lapCross!.offset(lc + 0.3, 'Round'));
+      const shallow = track(full.subtract(pocket));
+      if (!shallow.isEmpty()) fills.push(prism(shallow, -(L + lc) - 0.5, 0)); // its bottom sits inside the band below, not on a shared plane
       keepOut.push(track(M.cylinder(zFront + PUCK_HEAD - zFloor, sr, sr, 72, false).translate([cx, cy, zFloor])));
       keepOut.push(track(M.cube([CORE.notch.width, CORE.notch.depth + 0.6, zFront + PUCK_HEAD - zFloor], false).translate([cx - CORE.notch.width / 2, cy - sr - CORE.notch.depth, zFloor])));
-    });
-    // print prototype: closure magnets (one pair of 5x2 mm discs per spot) sit in bosses on the seam, outside the rim band
-    if (print) run('rim magnets', () => {
-      const rm = PRINT.rimMagnet, pr = rm.diameter / 2 + rm.clearance, pd = rm.thickness + 0.1; // pocket radius, depth each side of the seam
-      const room = track(track(seam!.offset(-(T + rm.margin + pr), 'Round')).subtract(track(C.circle(sr + CORE.notch.depth + pr + 0.4, 72).translate([cx, cy]))));
-      for (const sp of closureSpots(room, pr + 1)) {
-        const bossH = 2 * (pd + rm.boss);
-        fills.push(track(M.cylinder(bossH, pr + rm.boss, pr + rm.boss, 48, true).translate([sp.x, sp.y, splitOffset])));
-        pockets.push(track(M.cylinder(2 * pd, pr, pr, 40, true).translate([sp.x, sp.y, splitOffset])));
-        keepOut.push(track(M.cylinder(bossH + 2, pr + 0.3, pr + 0.3, 40, true).translate([sp.x, sp.y, splitOffset])));
-        rimMagnets += 2;
-      }
     });
     // the strap tunnel (every shape, back shell): a solid column from the back surface down to the seam holds it, so it prints from the plate
     // up with no overhang; two vertical slots (they print clean) are joined by a channel under a bar the cord wraps around
@@ -134,7 +129,6 @@ export async function buildCasing(input: {
     });
     let shell = run('hollow shell', () => track(outer.subtract(fills.length ? track(inner.subtract(track(M.union(fills as any[])))) : inner)));
     if (strapCut) { const cut = strapCut as Manifold; shell = run('strap cut', () => track(shell.subtract(cut))); }
-    if (pockets.length) shell = run('rim pockets', () => track(shell.subtract(track(M.union(pockets as any[])))));
 
     // seat cup: solid wall + floor around the puck, clipped to the outer envelope, then the seat is cut out
     shell = run('puck seat', () => {
@@ -190,7 +184,11 @@ export async function buildCasing(input: {
     // the Core, the magnets and the eyes as closed solids (they ship in every export alongside the two shells)
     const parts = run('hardware solids', () => {
       const poly = coreProfile().map(([r, y]) => [r, y] as [number, number]);
-      const core = track(track(api.Manifold.revolve(track(new api.CrossSection([poly])), 96)).translate([0, cy, zFloor + CORE.puckDepth / 2]));
+      const core0 = track(track(api.Manifold.revolve(track(new api.CrossSection([poly])), 96)).translate([0, cy, zFloor + CORE.puckDepth / 2]));
+      // the Core carries its own magnets: pockets in its underside, facing the ones in the seat floor
+      const mr = CORE.magnet.diameter / 2 + MAGNET_CLEARANCE, md = CORE.magnet.thickness + 0.1;
+      const corePockets = Array.from({ length: CORE.magnet.count }, (_, i) => track(M.cylinder(md + 1, mr, mr, 40, false).translate([0, cy + (i - (CORE.magnet.count - 1) / 2) * CORE.magnet.spacing, zFloor - 1])));
+      const core = track(core0.subtract(track(M.union(corePockets as any[]))));
       const mags = magnets.map((mg) => track(M.cylinder(CORE.magnet.thickness, CORE.magnet.diameter / 2, CORE.magnet.diameter / 2, 40, true).translate([mg.x, mg.y, mg.z])));
       const eyes = eyeShapes(place, p).map((e) => {
         const mat = [e.x.x, e.x.y, e.x.z, 0, e.y.x, e.y.y, e.y.z, 0, e.z.x, e.z.y, e.z.z, 0, e.c.x, e.c.y, e.c.z, 1];
@@ -212,12 +210,32 @@ export async function buildCasing(input: {
     if (print) {
       const lapped = run('half-lap seam', () => {
         const keep = track(M.union(keepOut as any[]));
-        // the lap (on the front shell) stays inside the cavity as it is at the lap's full depth (where it is narrowest), so a steep wall never runs into it
-        const reach = track(track(inner.slice(splitOffset - L - lc)).offset(-lc, 'Round'));
-        const ring = track(track(track(seam!.offset(-(T / 2 + lc / 2), 'Round').subtract(track(seam!.offset(-(T - PRINT.lapInset), 'Round')))).subtract(cupDisc!)));
-        const lap = track(track(track(ring.intersect(reach)).extrude(L + 0.2)).translate([0, 0, splitOffset - L]));
-        const front2 = track(M.union(frontF, track(lap.subtract(keep))));
-        return [front2, backF] as const;
+        const lap = track(track(lapCross!.extrude(L + 0.2)).translate([0, 0, splitOffset - L]));
+        // snap bead: a small ridge on the lap's outer face (a lead-in step, then the full bead) clicks into a groove cut in the back shell's rebate wall.
+        // The groove is the bead grown by the play, so the two can never collide; where the wall would be left under 1.2 mm there is no bead
+        const sn = PRINT.snap, a0 = T / 2 + lc / 2, z0g = -L + sn.start;
+        // where the groove may go: at least `minWall` of wall must stay outside it, checked at the groove's bottom, middle and top (the body narrows below the seam)
+        const wallSlices = [z0g - sn.play, z0g + sn.height / 2, z0g + sn.height + sn.play].map((z) => track(outer.slice(splitOffset + z).offset(-(sn.minWall + sn.play + 0.05), 'Round')));
+        const wallAt = wallSlices.slice(1).reduce((acc, c) => track(acc.intersect(c)), wallSlices[0]);
+        const core = track(lapCross!.offset(-0.2, 'Miter')), cupBig = track(cupDisc!.offset(sn.play + 0.3, 'Round'));
+        const clip = track(seam!.offset(-(a0 - 0.4), 'Round').subtract(track(seam!.offset(-(a0 + 0.77), 'Round'))));
+        const beadAt = (d: number) => {
+          const raw = track(track(track(lapCross!.offset(d, 'Miter')).subtract(core)).subtract(cupBig).intersect(clip).intersect(wallAt));
+          return raw;
+        };
+        // staircase profile: depth grows one layer's worth per layer up to `depth`, holds, then steps back down (45 degrees both ways, every step one print layer)
+        const nl = Math.max(1, Math.round(sn.height / sn.layer)), z0 = -L + sn.start;
+        const steps = Array.from({ length: nl }, (_, i) => [Math.min(sn.depth, (i + 1) * sn.layer, (nl - i) * sn.layer), z0 + i * sn.layer, z0 + (i + 1) * sn.layer] as const)
+          .map(([d, a, b]) => [beadAt(d), a, b] as const);
+        const slab = (cs: { isEmpty(): boolean; extrude(h: number): Manifold }, z0: number, z1: number): Manifold | null => (cs.isEmpty() ? null : track(track(cs.extrude(z1 - z0)).translate([0, 0, splitOffset + z0])));
+        const beadParts = steps.map(([cs, z0, z1]) => slab(cs, z0, z1)).filter((x): x is Manifold => !!x);
+        // the groove is one plain rectangular recess (vertical walls print cleanly): the full bead grown by the play, over the bead's whole height
+        const full = steps.find(([, a]) => a === z0 + Math.floor((nl - 1) / 2) * sn.layer) ?? steps[0];
+        const grooveParts = [slab(track(full[0].offset(sn.play, 'Miter')), z0 - sn.play, z0 + nl * sn.layer + sn.play)].filter((x): x is Manifold => !!x);
+        const bead = beadParts.length ? track(M.union(beadParts as any[])) : null;
+        const front2 = track(M.union(frontF, track((bead ? track(M.union(lap, bead)) : lap).subtract(keep))));
+        const back2 = grooveParts.length ? track(backF.subtract(track(track(M.union(grooveParts as any[])).subtract(keep)))) : backF;
+        return [front2, back2] as const;
       });
       frontF = lapped[0]; backF = lapped[1];
       frontF = run('engrave eyes', () => {
@@ -231,8 +249,7 @@ export async function buildCasing(input: {
       frontF = run('tidy front', () => track(frontF.simplify(PRINT.tidy)));
       backF = run('tidy back', () => track(backF.simplify(PRINT.tidy)));
       printOut = run('print layout', () => ({
-        parts: layoutFlat([{ name: 'Front shell', mesh: extract(frontF) }, { name: 'Back shell', mesh: extract(backF), flip: true }, { name: 'Core (fit dummy)', mesh: parts.core }], PRINT.gap),
-        rimMagnets,
+        parts: layoutFlat([{ name: 'Front shell', mesh: extract(frontF) }, { name: 'Back shell', mesh: extract(backF) }, { name: 'Core (fit dummy)', mesh: parts.core }], PRINT.gap),
       }));
     }
 

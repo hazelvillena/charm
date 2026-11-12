@@ -23,6 +23,20 @@ async function build(presetIx: number, patch: Record<string, unknown>, print: bo
   return { casing: await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params, place, print }), place, params };
 }
 
+describe('snap closure and Core magnets', () => {
+  it('has a snap bead on the front shell and a groove in the back shell, and the Core dummy has magnet pockets', async () => {
+    const saved = PRINT.snap.depth;
+    PRINT.snap.depth = 0.0001; const flat = await build(0, {}, true);
+    PRINT.snap.depth = saved; const snap = await build(0, {}, true);
+    expect(snap.casing.frontVolume - flat.casing.frontVolume).toBeGreaterThan(5); // the bead
+    expect(flat.casing.backVolume - snap.casing.backVolume).toBeGreaterThan(5); // the groove
+    const core = snap.casing.print!.parts[2].mesh, plain = (await build(0, {}, false)).casing.parts.core;
+    expect(core.tris.length).toBe(plain.tris.length); // same Core in every export: with its pockets
+    const b = bbox(core), pockets = CORE.magnet.count * Math.PI * (CORE.magnet.diameter / 2) ** 2 * CORE.magnet.thickness;
+    expect(pockets).toBeGreaterThan(0); expect(b.hi[2] - b.lo[2]).toBeGreaterThan(CORE.puckDepth - 0.1);
+  }, 60000);
+});
+
 describe('3D print prototype export', () => {
   for (const ix of [0, 1]) {
     it(`${PRESETS[ix].id}: parts lie flat on the plate, apart, with the Core as a fit dummy`, async () => {
@@ -58,8 +72,7 @@ describe('3D print prototype export', () => {
     // assembled (not laid out): the back's lap sits in the front's rebate with clearance, so the two never intersect
     const inter = f.intersect(b);
     expect(inter.volume()).toBeLessThan(0.5); // mm3: touching faces only
-    expect(casing.print!.rimMagnets % 2).toBe(0);
-    console.log('rim magnets', casing.print!.rimMagnets, 'front cm3', (casing.frontVolume / 1000).toFixed(2), 'back cm3', (casing.backVolume / 1000).toFixed(2));
+    console.log('front cm3', (casing.frontVolume / 1000).toFixed(2), 'back cm3', (casing.backVolume / 1000).toFixed(2));
   }, 40000);
 
   for (let ix = 0; ix < PRESETS.length; ix++) it(`${PRESETS[ix].id}: strap tunnel — a cord runs down one opening, under the bar and up the other; the bar and the outline are intact`, async () => {
@@ -94,7 +107,6 @@ describe('print prototype across the built-in shapes', () => {
       expect(f.status()).toBe('NoError'); expect(b.status()).toBe('NoError');
       expect(f.intersect(b).volume()).toBeLessThan(0.5);
       for (const x of casing.print!.parts) expect(weldedProblems(x.mesh), `${PRESETS[ix].id} ${x.name}`).toEqual({ open: 0, flipped: 0 });
-      console.log(PRESETS[ix].id, 'rim magnets', casing.print!.rimMagnets);
     }, 40000);
   }
 });

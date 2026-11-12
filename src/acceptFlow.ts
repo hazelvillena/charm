@@ -113,7 +113,7 @@ export function setupAccept(ctx: AcceptCtx) {
       download(`${name}-3dprint.stl`, mergeStl(c.print!.parts.map((x) => x.mesh), 'clayground 3d print: front shell, back shell, core fit dummy'));
       // say what is in the file, so a missing piece is explained, not a surprise
       const hole = place.strap ? 'strap tunnel included' : 'no strap tunnel (no room for it on the back)';
-      toast(`3D print STL saved · ${name} · front, back, Core dummy · ${hole} · ${c.print!.rimMagnets} rim magnets (5×2 mm)`, 'info', 9000);
+      toast(`3D print STL saved · ${name} · front, back, Core dummy · ${hole}`, 'info', 9000);
     } catch (e) {
       console.error(e);
       toast(`Print build failed at ${e instanceof AcceptError ? e.step : 'unknown'}`, 'error');

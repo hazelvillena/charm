@@ -1,39 +1,4 @@
-import type { ManifoldApi } from './kernel';
 import type { MeshOut } from './solids';
-
-type Track = <T extends { delete(): void }>(x: T) => T;
-type CS = InstanceType<ManifoldApi['CrossSection']>;
-
-/** x of the right-most edge of a region on the horizontal line y (null when the region does not reach it) */
-function rightmost(polys: ReadonlyArray<ReadonlyArray<ArrayLike<number>>>, y: number): number | null {
-  let best: number | null = null;
-  for (const poly of polys) for (let i = 0; i < poly.length; i++) {
-    const a = poly[i], b = poly[(i + 1) % poly.length];
-    if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) {
-      const x = a[0] + ((y - a[1]) / (b[1] - a[1])) * (b[0] - a[0]);
-      if (best === null || x > best) best = x;
-    }
-  }
-  return best;
-}
-
-/**
- * Where the rim magnets go: the shape is mirrored, so spots come as a left/right pair at one height.
- * `room` is the region where a pocket's centre may sit (clear of the rim band, the Core seat and the notch).
- * Picks the height where the pair can sit furthest apart; returns [] when there is no room.
- */
-export function closureSpots(room: CS, minX: number): { x: number; y: number }[] {
-  if (room.isEmpty()) return []; // a very small shape leaves no room (an empty region has infinite bounds)
-  const polys = room.toPolygons(), bb = room.bounds();
-  let bestX = -1, bestY = 0;
-  for (let y = bb.min[1]; y <= bb.max[1]; y += 0.5) {
-    const x = rightmost(polys, y);
-    if (x !== null && x > bestX + 1e-6) { bestX = x; bestY = y; }
-  }
-  if (bestX < minX) return [];
-  const x = Math.floor(bestX * 10) / 10 - 0.05; // a hair inside the region
-  return [{ x, y: bestY }, { x: -x, y: bestY }];
-}
 
 const bboxOf = (m: MeshOut) => {
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
