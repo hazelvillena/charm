@@ -9,7 +9,7 @@ import { Profile } from './geometry/profile';
 import { placeFeatures, Placement } from './geometry/features';
 import { SceneView } from './scene/scene';
 import { buildReferenceGhost } from './scene/referenceGhost';
-import { cloneOutline, clampOutline } from './params/outline';
+import { cloneOutline, clampOutline, scaleOutline } from './params/outline';
 import { blendOutlines } from './params/outlineEdit';
 import { cloneSide, lerpSide, defaultSide } from './params/side';
 import { Params, SCHEMA } from './params/schema';
@@ -310,7 +310,7 @@ function runChecks() {
   const s = store.state;
   const results: Record<string, CheckResult> = {};
   try {
-    const prof = new Profile(s.outline);
+    const prof = new Profile(scaleOutline(s.outline, s.params.scaleW ?? 1, s.params.scaleH ?? 1, s.params.wall));
     if (computeInner()) {
       const inner = innerGeometry(innerL2, engine.smoothFaces(2));
       const w = checkWall(view.geometry(2), inner.bvh, s.params.wall);

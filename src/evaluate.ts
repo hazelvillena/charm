@@ -9,7 +9,7 @@ import { checkNook } from './checks/nook';
 import { checkWall, innerGeometry } from './checks/wall';
 import { draftAngles, checkDraft } from './checks/analysis';
 import { DENSITY_G_CM3 } from './spec/materials';
-import { Outline, clampOutline } from './params/outline';
+import { Outline, clampOutline, scaleOutline } from './params/outline';
 import { Params } from './params/schema';
 
 export type Evaluation = { positions: Float32Array; checks: CheckResult[]; ok: boolean; weightG: number | null; failing: string[]; sizeMm: [number, number]; puck: { point: Vector3; normal: Vector3 } | null; eyes: ThumbEye[] };
@@ -35,7 +35,7 @@ export function evaluateIteration(engine: ShapeEngine, outlineIn: Outline, param
   const checks: CheckResult[] = [];
   let weightG: number | null = null;
   try {
-    checks.push(checkFit(new Profile(outline), params, bvh, g, place));
+    checks.push(checkFit(new Profile(scaleOutline(outline, params.scaleW ?? 1, params.scaleH ?? 1, params.wall)), params, bvh, g, place));
     const innerPos = new Float32Array(engine.smoothVertCount(2) * 3);
     if (engine.innerSurface(pos, 2, params.wall, innerPos)) {
       const inner = innerGeometry(innerPos, faces2);

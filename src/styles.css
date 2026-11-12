@@ -53,6 +53,7 @@ html, body { margin: 0; height: 100%; background: var(--surface); font: var(--t-
 .finish-seg button { flex: 1 1 30%; }
 
 /* outline + side editors */
+.outline-toggles { display: flex; gap: var(--s-3); align-items: center; margin-left: auto; }
 .outline-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--s-2); margin-bottom: var(--s-2); }
 .mini-toggle { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; color: var(--ink-2); font-size: var(--t-xs); }
 .mini-toggle input { accent-color: var(--accent); }

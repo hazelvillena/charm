@@ -1,6 +1,6 @@
 import { QuadSphere } from './quadSphere';
 import { Profile, SideCurve } from './profile';
-import { Outline } from '../params/outline';
+import { Outline, scaleOutline } from '../params/outline';
 import { SideProfile } from '../params/side';
 import { CORE, seatRadius } from '../params/core';
 import { PoissonInflator } from './inflate';
@@ -26,7 +26,7 @@ export const setInflationMode = (m: 'poisson' | 'legacy') => { inflationMode = m
 const sharedInflator = new PoissonInflator();
 export type MapOptions = { inflator?: PoissonInflator; iterations?: number };
 
-export type ShapeParams = { depth: number; belly: number; backFlat: number; plateau: number; corePlateau?: boolean; wall: number; side: SideProfile };
+export type ShapeParams = { depth: number; belly: number; backFlat: number; plateau: number; corePlateau?: boolean; wall: number; side: SideProfile; scaleW?: number; scaleH?: number };
 
 export type ShapeInfo = {
   shiftY: number;      // distance from the body bottom to the puck center C
@@ -51,7 +51,7 @@ export function frontBackDepth(p: Pick<ShapeParams, 'depth' | 'belly'>) {
  * so both shells share the same shift and side-profile heights.
  */
 export function mapShape(qs: QuadSphere, outline: Outline, p: ShapeParams, out: Float32Array, inset = 0, forced?: Forced, opts: MapOptions = {}): ShapeInfo {
-  const prof = new Profile(outline);
+  const prof = new Profile(scaleOutline(outline, p.scaleW ?? 1, p.scaleH ?? 1, p.wall));
   const sf = new SideCurve(p.side.front, p.side.frontT, p.side.smooth ?? 1), sb = new SideCurve(p.side.back, p.side.backT, p.side.smooth ?? 1);
   const { zf, zb } = frontBackDepth(p);
   const nf = FRONT_EXPONENT;

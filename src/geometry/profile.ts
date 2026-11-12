@@ -1,4 +1,5 @@
 import { Outline, ringOf } from '../params/outline';
+import { smoothRing } from './smoothRing';
 
 const TWO_PI = Math.PI * 2;
 
@@ -13,12 +14,14 @@ export class Profile {
   private n: number;
   private s: number; // smoothness 0..1: straight segments -> smooth cubic
   private nHalf: number; // right-half point count: ring indices 0 and nHalf-1 are the axis points
+  private tab: { n: number; r: Float64Array } | null = null; // smooth-curve outlines: R(phi) on a uniform angle grid (see smoothRing.ts)
 
   constructor(outline: Outline) {
     this.s = Math.min(1, Math.max(0, outline.smooth ?? 1));
     this.nHalf = outline.phi.length;
     const ring = ringOf(outline);
     this.a = ring.a; this.r = ring.r; this.n = ring.a.length;
+    if (outline.curve === 'c2') { this.tab = smoothRing(ring.a, ring.r, this.s); this.m = []; return; }
     const n = this.n;
     const h = (k: number) => (k === n - 1 ? this.a[0] + TWO_PI - this.a[n - 1] : this.a[k + 1] - this.a[k]);
     const d = (k: number) => (this.r[(k + 1) % n] - this.r[k]) / h(k);
@@ -31,6 +34,7 @@ export class Profile {
 
   /** returns radius and dR/dphi */
   eval(phi: number): { r: number; dr: number } {
+    if (this.tab) return this.evalTab(phi);
     const a0 = this.a[0], n = this.n;
     let p = (phi - a0) % TWO_PI; if (p < 0) p += TWO_PI;
     p += a0;
@@ -53,6 +57,17 @@ export class Profile {
     if (axisStart && !axisEnd) { tl = t * t; dtl = 2 * t; } else if (axisEnd && !axisStart) { tl = 1 - (1 - t) * (1 - t); dtl = 2 * (1 - t); }
     const rl = y0 + (y1 - y0) * tl, drl = ((y1 - y0) * dtl) / h;
     return { r: s * rc + (1 - s) * rl, dr: s * drc + (1 - s) * drl };
+  }
+
+  /** the smooth-curve table: cubic Hermite between grid angles, slopes from neighbours (continuous slope, no kinks) */
+  private evalTab(phi: number): { r: number; dr: number } {
+    const { n, r } = this.tab!, step = TWO_PI / n;
+    let p = (phi + Math.PI / 2) % TWO_PI; if (p < 0) p += TWO_PI; // grid starts at -pi/2
+    const k = Math.floor(p / step), t = p / step - k, i0 = (k + n - 1) % n, i1 = k % n, i2 = (k + 1) % n, i3 = (k + 2) % n;
+    const m1 = (r[i2] - r[i0]) / 2, m2 = (r[i3] - r[i1]) / 2, t2 = t * t, t3 = t2 * t; // slopes per grid step
+    const rc = (2 * t3 - 3 * t2 + 1) * r[i1] + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * r[i2] + (t3 - t2) * m2;
+    const dr = ((6 * t2 - 6 * t) * r[i1] + (3 * t2 - 4 * t + 1) * m1 + (-6 * t2 + 6 * t) * r[i2] + (3 * t2 - 2 * t) * m2) / step;
+    return { r: rc, dr };
   }
 
   radius(phi: number): number { return this.eval(phi).r; }

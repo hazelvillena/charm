@@ -4,7 +4,7 @@ import { OUTLINE_MIN_GAP_DEG } from './core';
 
 const DEG = Math.PI / 180;
 export type StrokeFit = { outline: Outline; maxErrorMm: number; coverage: number; grew: boolean; points: number };
-export type FitOptions = { fidelity?: number; mirror?: boolean }; // 0 = smooth / approximate (few points, heavy smoothing), 1 = faithful (many points, none)
+export type FitOptions = { fidelity?: number; mirror?: boolean; curve?: 'c2' }; // 0 = smooth / approximate (few points, heavy smoothing), 1 = faithful (many points, none)
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -59,7 +59,7 @@ export function fitOutlineFromStroke(stroke: [number, number][], wall: number, o
   const target = Math.round(lerp(4, 18, fid));
   const fitHalf = (f: (deg: number) => number) => {
     const fitFor = (angles: number[]) => {
-      const prof = new Profile(makeOutline(angles, angles.map(f)));
+      const prof = new Profile({ ...makeOutline(angles, angles.map(f)), ...(opts.curve ? { curve: opts.curve } : {}) });
       let worst = 0, at2 = 0;
       for (let a = -90; a <= 90; a++) { const e = Math.abs(prof.radius(a * DEG) - f(a)); if (e > worst) { worst = e; at2 = a; } }
       return { worst, at: at2 };
@@ -78,7 +78,8 @@ export function fitOutlineFromStroke(stroke: [number, number][], wall: number, o
     return { angles, radii: angles.map(f) };
   };
   const RH = fitHalf(sideR), Lh = mirror ? RH : fitHalf(sideL);
-  let outline = makeOutline(RH.angles, RH.radii, 1 - 0.12 * fid);
+  let outline = makeOutline(RH.angles, RH.radii, opts.curve ? 1 : 1 - 0.12 * fid);
+  if (opts.curve) outline.curve = opts.curve;
   if (!mirror) {
     const top = 0.5 * (RH.radii[RH.radii.length - 1] + Lh.radii[Lh.radii.length - 1]), bottom = 0.5 * (RH.radii[0] + Lh.radii[0]); // the axis points are shared
     outline.r[0] = bottom; outline.r[outline.r.length - 1] = top;

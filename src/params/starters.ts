@@ -32,22 +32,27 @@ const WHITE: Look = { color: '#F4F5F7', finish: 'gloss' }; // PC, white, gloss
 /**
  * Shuriken, traced from a pencil sketch (docs/sketches/shuriken-tile.jpg): a top point, a long right arm, a bottom point and a left corner,
  * not mirrored. The sketch's outline was cast from the Core centre (0.11 mm per sketch pixel), its tips rounded to a 3 mm radius (a needle-thin
- * tip is thinner than the shell wall) and its notches to 3 mm, the two edges that hugged the Core pushed out a little so the seat clears,
- * then fitted with 18 points a side so the tips and corners stay articulated.
+ * tip is thinner than the shell wall) and its notches to 3 mm, the two edges that hugged the Core pushed out a little so the seat clears, then
+ * fitted with 12 points a side on the smooth curve (so a long edge is one clean arc, not a lump at each point).
  */
 const shuriken = (): Outline => {
-  const o = makeOutline([-90, -87.5, -77.5, -65, -45, -30, -2.5, 10, 15, 17.5, 20, 27.5, 45, 60, 65, 75, 80, 90],
-    [28.4, 27.1, 26, 25.6, 23.4, 24.1, 35.8, 43, 38.6, 32.6, 30.4, 26, 24.3, 29.1, 33.1, 45, 44.6, 39.6]);
-  o.left = { phi: [-90, -87.5, -80, -75, -70, -65, -45, -35, -22.5, -10, -2.5, 7.5, 22.5, 30, 50, 77.5, 85, 90].map((d) => d * D),
-    r: [28.4, 30.2, 40.4, 39.7, 36.3, 34.5, 30.9, 27, 25.7, 30.4, 38, 40.2, 35.6, 33.4, 31.2, 34.9, 37.4, 39.6] };
+  const o = makeOutline([-90, -85, -65, -25, -7.5, 10, 20, 45, 67.5, 77.5, 85, 90],
+    [29.1, 26.9, 25.5, 25.4, 33.2, 42, 31.2, 24.5, 36.7, 44.6, 41.9, 39.6]);
+  o.left = { phi: [-90, -82.5, -77.5, -65, -45, -30, -12.5, -2.5, 7.5, 45, 82.5, 90].map((d) => d * D),
+    r: [29.1, 36.9, 39.8, 34.6, 30.7, 26.2, 28.8, 37.1, 39.8, 31.4, 36.4, 39.6] };
+  o.curve = 'c2';
   return o;
 };
 /** Tile, from the same sketch: a rounded square with the Core a little below centre (mirrored; the sketch's Core sat off to one side, centred here) */
-const tile = (): Outline => makeOutline([-90, -72, -58, -46, -32, 0, 32, 46, 58, 72, 90], [32.2, 33.9, 36.9, 36.8, 32.8, 27.8, 32.8, 39.4, 42.0, 40.0, 38.0]); // corner radius 13 mm
+const tile = (): Outline => ({ curve: 'c2' as const, ...makeOutline([-90, -72, -58, -46, -32, 0, 32, 46, 58, 72, 90], [32.2, 33.9, 36.9, 36.8, 32.8, 27.8, 32.8, 39.4, 42.0, 40.0, 38.0]) }); // corner radius 13 mm, on the smooth curve
+
+/** Slate: a sleeker Tile: narrower (44 mm), taller, a larger corner radius and a thinner body (28 mm deep), still with the Charmer's inflation */
+const slate = (): Outline => ({ curve: 'c2' as const, ...makeOutline([-90, -72, -58, -46, -32, 0, 32, 46, 58, 72, 90], [28, 29.4, 30.1, 29.1, 25.9, 22, 25.9, 31.6, 36, 37.4, 36]) }); // 44 x 64 mm, corner radius 14 mm
 
 export const STARTERS: Starter[] = [
   saved(BLOB10), // kept from the deployed app (Blob10): PC/ABS, gloss
   { name: 'Shuriken', outline: shuriken(), params: { ...inflated, eyeHeight: 0.72, eyeSpacing: 4.7 }, look: WHITE },
+  { name: 'Slate', outline: slate(), params: { ...inflated, depth: 28, eyes: 'one', eyeHeight: 0.78 }, look: WHITE },
   { name: 'Tile', outline: tile(), params: { ...inflated, eyes: 'one', eyeHeight: 0.78 }, look: WHITE },
   // flat base, round top: nothing else in the library has a straight edge on the bottom
   { name: 'Arch', outline: polar((p) => { const flat = 21 / Math.max(1e-3, Math.abs(sinc(p))), k = 2.2, below = p < 0 ? -k * Math.log(Math.exp(-flat / k) + Math.exp(-30 / k)) : 30 - 3 * sinc(p) ** 2; return below; }, 11), params: { depth: 30, belly: 0.5, backFlat: 0.7, eyeHeight: 0.7 }, look: { color: '#F3EEE3', finish: 'matte' } },

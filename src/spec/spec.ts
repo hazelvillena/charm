@@ -9,7 +9,7 @@ import { CheckResult } from '../checks/fit';
 export type Spec = ReturnType<typeof buildSpec>;
 
 export function paramHash(params: Params, outline: Outline): string {
-  const s = JSON.stringify([params, outline.phi.map((x) => +x.toFixed(3)), outline.r.map((x) => +x.toFixed(2)), outline.left ? [outline.left.phi.map((x) => +x.toFixed(3)), outline.left.r.map((x) => +x.toFixed(2))] : 0]);
+  const s = JSON.stringify([params, outline.phi.map((x) => +x.toFixed(3)), outline.r.map((x) => +x.toFixed(2)), outline.left ? [outline.left.phi.map((x) => +x.toFixed(3)), outline.left.r.map((x) => +x.toFixed(2))] : 0, outline.curve ?? 0]);
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(16).slice(0, 4).padStart(4, '0');
@@ -34,6 +34,6 @@ export function buildSpec(args: {
     checks: args.checks.map((c) => ({ id: c.id, ok: c.ok, detail: c.detail })),
     cage: { vertices: args.cageVerts, quads: args.cageFaces, subdivisionLevel: args.level },
     notes: ['Eyes are separate parts (not cut into the shells).', 'Cage OBJ is designed to open as SubD in Rhino (ToSubD); round trip not yet verified.'],
-    params, outline: { phi: args.outline.phi, r: args.outline.r, ...(args.outline.left ? { left: args.outline.left } : {}) },
+    params, outline: { phi: args.outline.phi, r: args.outline.r, ...(args.outline.left ? { left: args.outline.left } : {}), ...(args.outline.curve ? { curve: args.outline.curve } : {}) },
   };
 }

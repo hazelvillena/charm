@@ -180,7 +180,7 @@ describe('starter library: smooth, abstract, and sound', () => {
   it('has distinct names and a first-run library is seeded exactly once', () => {
     expect(new Set(STARTERS.map((s) => s.name)).size).toBe(STARTERS.length);
     const lib = new Library(); expect(lib.items.length).toBe(STARTERS.length + PRESETS.length);
-    expect(lib.starred().map((i) => i.name)).toEqual(['Charmer', 'Star', 'Triangle', 'Drop', 'Clover']); // the favourites the pill starts with
+    expect(lib.starred().map((i) => i.name)).toEqual(['Charmer', 'Star', 'Triangle', 'Drop', 'Shuriken', 'Slate', 'Tile', 'Clover']); // the favourites the pill starts with
   });
 });
 

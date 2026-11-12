@@ -71,6 +71,7 @@ export function outlineFromPoints(points: [number, number][], wall: number, mirr
     left = fill(half(leftPts), full, (phi) => Math.PI - phi);
   }
   const out = makeOutline([], [], smooth);
+  out.curve = 'c2'; // clicked points are joined by the smooth curve
   out.phi = right.map((p) => p.phi); out.r = right.map((p) => p.r);
   if (left) out.left = { phi: left.map((p) => p.phi), r: left.map((p) => p.r) };
   const radii = [...out.r, ...(out.left?.r ?? [])];

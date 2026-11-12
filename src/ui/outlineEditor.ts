@@ -37,7 +37,7 @@ export class OutlineEditor {
   private wall = 1.6;
   private showRef = false;
   private active = -1; private selected = -1; private activeSide: Side = 'R'; private selSide: Side = 'R';
-  private mirror = true; private mirrorInput!: HTMLInputElement;
+  private mirror = true; private mirrorInput!: HTMLInputElement; private curveInput!: HTMLInputElement;
   /** several points selected at once (Cmd/Ctrl-click, a Cmd/Ctrl-drag box, Cmd/Ctrl+A): keys like 'R:3' / 'L:5'; they move together */
   private multi = new Set<string>(); private marquee: SVGRectElement; private marq: { x0: number; y0: number; add: boolean } | null = null;
   private groupDrag: { x0: number; y0: number; pts: { side: Side; i: number; x: number; y: number }[] } | null = null;
@@ -107,6 +107,8 @@ export class OutlineEditor {
     (['points', 'freehand'] as const).forEach((k) => { const b = h('button', { type: 'button', text: k === 'points' ? 'Points' : 'Freehand', onClick: () => this.setDrawKind(k) }) as HTMLButtonElement; this.kindBtns.push(b); this.kindSeg.append(b); });
     this.mirrorInput = h('input', { type: 'checkbox', onChange: () => this.setMirror(this.mirrorInput.checked) }) as HTMLInputElement; this.mirrorInput.checked = true;
     const mirrorToggle = h('label', { class: 'mini-toggle', title: 'Mirror the left side of the shape from the right. Off: draw each side on its own' }, this.mirrorInput, h('span', { text: 'Mirror' }));
+    this.curveInput = h('input', { type: 'checkbox', onChange: () => this.setCurve(this.curveInput.checked) }) as HTMLInputElement;
+    const curveToggle = h('label', { class: 'mini-toggle', title: 'Join the points with a truly smooth curve (older shapes use the original curve, which lumps at each point)' }, this.curveInput, h('span', { text: 'Smooth curve' }));
     const refToggle = h('label', { class: 'mini-toggle' }, h('input', { type: 'checkbox', onChange: (e: Event) => { this.showRef = (e.target as HTMLInputElement).checked; this.render(); this.onRef?.(this.showRef); } }), h('span', { text: 'Original' }));
     this.busy = h('div', { class: 'ui-busy hidden' }, h('div', { class: 'ui-spinner' }), h('span', { text: 'Shaping…' }));
 
@@ -131,7 +133,7 @@ export class OutlineEditor {
     this.pad.hud.append(this.drawCtl, this.ptsCtl);
     this.pad.foot.prepend(refToggle); // Original sits quietly at the bottom of the canvas, beside Reset
 
-    this.el = h('div', { class: 'outline-editor ui-pad-editor' }, h('div', { class: 'outline-tools' }, seg, this.kindSeg, mirrorToggle),
+    this.el = h('div', { class: 'outline-editor ui-pad-editor' }, h('div', { class: 'outline-tools' }, seg, this.kindSeg, h('div', { class: 'outline-toggles' }, mirrorToggle, curveToggle)),
       h('div', { class: 'outline-stage' }, this.pad.el, this.busy));
     this.setDrawKind('points'); this.setMode('edit');
   }
@@ -139,7 +141,14 @@ export class OutlineEditor {
   set(outline: Outline, wall: number) {
     this.outline = outline; this.wall = wall;
     if (this.mode === 'edit' && this.mirror !== !outline.left) { this.mirror = !outline.left; this.mirrorInput.checked = this.mirror; }
+    this.curveInput.checked = outline.curve === 'c2';
     this.render();
+  }
+  /** the smooth curve on or off for the current outline (the points stay where they are) */
+  private setCurve(on: boolean) {
+    if (!this.outline) return;
+    const o = cloneOutline(this.outline); if (on) o.curve = 'c2'; else delete o.curve;
+    this.outline = o; this.render(); this.onChange(o, true);
   }
   /** Mirror on/off. Editing: turns the current outline mirrored or independent (the left starts as a copy of the right). Drawing: how the new shape will be made. */
   private setMirror(on: boolean) {
@@ -416,7 +425,7 @@ export class OutlineEditor {
   private refit() {
     if (!this.reviewing) return;
     let fit: StrokeFit | null = null;
-    try { fit = fitOutlineFromStroke(this.stroke, this.wall, { fidelity: this.fidelity, mirror: this.mirror }); } catch { fit = null; }
+    try { fit = fitOutlineFromStroke(this.stroke, this.wall, { fidelity: this.fidelity, mirror: this.mirror, curve: 'c2' }); } catch { fit = null; }
     this.fit = fit;
     this.preview.setAttribute('d', fit ? pathOf(fit.outline) : '');
     this.genBtn.disabled = !fit;

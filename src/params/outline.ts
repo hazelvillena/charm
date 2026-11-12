@@ -9,13 +9,14 @@ import { OUTLINE_MAX_RADIUS, OUTLINE_MIN_GAP_DEG, outlineMinRadius } from './cor
  * `smooth` blends between straight segments (0, like degree 1) and a smooth cubic curve (1).
  */
 export type Half = { phi: number[]; r: number[] };
-export type Outline = { phi: number[]; r: number[]; smooth: number; left?: Half }; // phi in radians ascending -pi/2..pi/2; r in mm
+/** `curve: 'c2'` = the points are joined by a truly smooth curve (continuous bend, no per-point lumps); absent = the original curve (older shapes keep it) */
+export type Outline = { phi: number[]; r: number[]; smooth: number; left?: Half; curve?: 'c2' }; // phi in radians ascending -pi/2..pi/2; r in mm
 
 export const OUTLINE_MIN_POINTS = 4;
 export const OUTLINE_MAX_POINTS = 24; // per side: enough to articulate a tight corner (a tip needs points a few degrees apart)
 const DEG = Math.PI / 180;
 
-export const cloneOutline = (o: Outline): Outline => ({ phi: [...o.phi], r: [...o.r], smooth: o.smooth ?? 1, ...(o.left ? { left: { phi: [...o.left.phi], r: [...o.left.r] } } : {}) });
+export const cloneOutline = (o: Outline): Outline => ({ phi: [...o.phi], r: [...o.r], smooth: o.smooth ?? 1, ...(o.left ? { left: { phi: [...o.left.phi], r: [...o.left.r] } } : {}), ...(o.curve ? { curve: o.curve } : {}) });
 export const isMirrored = (o: Outline) => !o.left;
 /** the left half as points (the right half again when mirrored) */
 export const leftOf = (o: Outline): Half => o.left ?? { phi: o.phi, r: o.r };
@@ -89,4 +90,21 @@ export function lerpOutline(a: Outline, b: Outline, t: number): Outline {
   }
   o.smooth = (a.smooth ?? 1) + ((b.smooth ?? 1) - (a.smooth ?? 1)) * t;
   return o;
+}
+
+/**
+ * The outline scaled across (sx) and up (sy) around the Core centre: every control point is moved in the flat view, so the shape,
+ * its curve type and its two halves stay as drawn. Radii are kept clear of the Core. Returns the same outline when the scale is 1.
+ */
+export function scaleOutline(o: Outline, sx: number, sy: number, wall: number): Outline {
+  if (sx === 1 && sy === 1) return o;
+  const out = cloneOutline(o), move = (h: Half) => {
+    const n = h.phi.length;
+    for (let i = 0; i < n; i++) {
+      const x = h.r[i] * Math.cos(h.phi[i]) * sx, y = h.r[i] * Math.sin(h.phi[i]) * sy;
+      h.phi[i] = i === 0 ? -Math.PI / 2 : i === n - 1 ? Math.PI / 2 : Math.atan2(y, x); h.r[i] = Math.hypot(x, y);
+    }
+  };
+  move(out); if (out.left) move(out.left);
+  return clampOutline(out, wall);
 }

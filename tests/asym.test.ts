@@ -122,7 +122,7 @@ describe('an asymmetric shape builds and prints', () => {
 });
 
 describe('the sketchbook and saved starters print cleanly', () => {
-  for (const name of ['Blob10', 'Shuriken', 'Tile']) it(`${name}: watertight print set with the strap tunnel and the snap`, async () => {
+  for (const name of ['Blob10', 'Shuriken', 'Tile', 'Slate']) it(`${name}: watertight print set with the strap tunnel and the snap`, async () => {
     const st = STARTERS.find((x) => x.name === name)!, params = starterParams(st), a = buildAll(clampOutline(st.outline, params.wall), params, 3);
     expect(a.place.strap, 'strap tunnel fits').not.toBeNull();
     const flat = PRINT.snap.depth; PRINT.snap.depth = 0.0001;

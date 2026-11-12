@@ -1,5 +1,5 @@
 import { Outline, cloneOutline } from './params/outline';
-import { Params } from './params/schema';
+import { Params, defaultParams } from './params/schema';
 import { cloneSide } from './params/side';
 import { Look, MaterialId } from '../design/finishes';
 import { STARTERS, starterParams } from './params/starters';
@@ -16,7 +16,7 @@ export type Iteration = {
 };
 
 const KEY = 'charmer-playground:v1';
-const VERSION = 15; // 2 = presets live in the library (starred); 3 = default eyes 2.4 mm; 4 = a varied material per built-in iteration; 5 = the attachment loop is off by default; 6-7 = thumbnails show the Core and eyes, in each item's own material (re-rendered)
+const VERSION = 17; // 2 = presets live in the library (starred); 3 = default eyes 2.4 mm; 4 = a varied material per built-in iteration; 5 = the attachment loop is off by default; 6-7 = thumbnails show the Core and eyes, in each item's own material (re-rendered)
 const cloneParams = (p: Params): Params => ({ ...p, side: cloneSide(p.side) });
 const newId = () => 'it_' + Math.random().toString(36).slice(2, 9);
 const make = (name: string, params: Params, outline: Outline, look: Look, starred: boolean): Iteration =>
@@ -40,6 +40,7 @@ const SEED_MATERIALS: Record<string, { material: MaterialId; look: Look }> = {
   Blob10: { material: 'PC/ABS', look: { color: '#E4E6EA', finish: 'gloss' } },
   Shuriken: { material: 'PC/ABS', look: { color: '#F4F5F7', finish: 'gloss' } },
   Tile: { material: 'PC/ABS', look: { color: '#F4F5F7', finish: 'gloss' } },
+  Slate: { material: 'PC/ABS', look: { color: '#F4F5F7', finish: 'gloss' } },
 };
 const seeded = (name: string, params: Params, look: Look): { params: Params; look: Look } => {
   const m = SEED_MATERIALS[name]; return m ? { params: { ...params, material: m.material }, look: { ...m.look } } : { params, look };
@@ -47,7 +48,9 @@ const seeded = (name: string, params: Params, look: Look): { params: Params; loo
 
 /** The built-in presets (starred, so they start in the pill) and the smooth starter shapes. */
 const presetItems = () => PRESETS.map((p) => { const v = seeded(p.name, presetParams(p), { color: '#B8C8DB', finish: 'gloss' }); return make(p.name, v.params, p.outline, v.look, p.name !== 'Blob'); }); // Blob is a plain study; the pill starts with Charmer, Star, Triangle, Drop and Clover
-const starterItems = () => STARTERS.map((st) => { const v = seeded(st.name, starterParams(st), st.look); return make(st.name, v.params, st.outline, v.look, st.name === 'Clover'); });
+/** starters that start in the pill (the favourites) */
+const STARRED_STARTERS = new Set(['Clover', 'Shuriken', 'Slate', 'Tile']);
+const starterItems = () => STARTERS.map((st) => { const v = seeded(st.name, starterParams(st), st.look); return make(st.name, v.params, st.outline, v.look, STARRED_STARTERS.has(st.name)); });
 
 export class Library {
   items: Iteration[] = [];
@@ -91,6 +94,8 @@ export class Library {
       if (this.version < 13) { const arch = starterItems().find((i) => i.name === 'Arch'); for (const it of this.items) if (it.name === 'Arch' && arch) { it.outline = arch.outline; it.thumb = undefined; } } // Arch: the lower flat base that clears the Core
       if (this.version < 14) { const have = new Set(this.items.map((i) => i.name)); this.items = [...starterItems().filter((i) => i.name === 'Blob10' && !have.has(i.name)), ...this.items]; } // Blob10 ships with the app now
       if (this.version < 15) { const have = new Set(this.items.map((i) => i.name)); this.items = [...starterItems().filter((i) => ['Shuriken', 'Tile'].includes(i.name) && !have.has(i.name)), ...this.items]; } // two shapes from the sketchbook
+      if (this.version < 16) { const have = new Set(this.items.map((i) => i.name)); this.items = [...starterItems().filter((i) => i.name === 'Slate' && !have.has(i.name)), ...this.items]; } // a sleeker Tile
+      if (this.version < 17) for (const it of this.items) if (['Shuriken', 'Slate', 'Tile'].includes(it.name)) it.starred = true; // the sketchbook shapes are favourites
       this.version = VERSION; this.save();
     }
   }
@@ -118,7 +123,11 @@ export class Library {
   private load() {
     try {
       const j = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-      if (Array.isArray(j.items)) this.items = j.items.filter((i: any) => i && i.id && i.params && i.outline && i.look);
+      if (Array.isArray(j.items)) {
+        this.items = j.items.filter((i: any) => i && i.id && i.params && i.outline && i.look);
+        const defs = defaultParams(); // items saved before a parameter existed (eyeX, the width / height scale) get its default
+        for (const it of this.items) it.params = { ...defs, ...it.params, side: it.params.side ?? defs.side };
+      }
       this.seeded = !!j.seeded || this.items.length > 0; // a returning user's library is never re-seeded behind their back
       this.version = typeof j.v === 'number' ? j.v : this.items.length ? 1 : 0;
     } catch { this.items = []; }

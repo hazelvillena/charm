@@ -65,16 +65,18 @@ export function removePointAuto(o: Outline, wall: number): Outline | null {
 export function blendOutlines(a: Outline, b: Outline, t: number): Outline {
   if (t <= 0) return cloneOutline(a);
   if (t >= 1) return cloneOutline(b);
-  const same = a.phi.length === b.phi.length && leftOf(a).phi.length === leftOf(b).phi.length;
+  const same = a.phi.length === b.phi.length && leftOf(a).phi.length === leftOf(b).phi.length && a.curve === b.curve;
   if (same) return lerpOutline(a, b, t);
   const pa = new Profile(a), pb = new Profile(b), angles: number[] = [], radii: number[] = [], radiiL: number[] = [];
-  for (let i = 0; i < 11; i++) {
-    const d = -90 + i * 18; angles.push(d);
+  const N = a.curve || b.curve ? 24 : 11, dd = 180 / (N - 1); // a smooth curve needs a finer grid to look the same in between
+  for (let i = 0; i < N; i++) {
+    const d = -90 + i * dd; angles.push(d);
     radii.push(pa.radius(d * DEG) * (1 - t) + pb.radius(d * DEG) * t);
     radiiL.push(pa.radius((180 - d) * DEG) * (1 - t) + pb.radius((180 - d) * DEG) * t);
   }
   const out = makeOutline(angles, radii, (a.smooth ?? 1) * (1 - t) + (b.smooth ?? 1) * t);
-  if (a.left || b.left) { radiiL[0] = radii[0]; radiiL[10] = radii[10]; out.left = { phi: [...out.phi], r: radiiL }; }
+  if (a.left || b.left) { radiiL[0] = radii[0]; radiiL[N - 1] = radii[N - 1]; out.left = { phi: [...out.phi], r: radiiL }; }
+  if (b.curve) out.curve = 'c2';
   return out;
 }
 
@@ -90,7 +92,7 @@ export function recenterOutline(outline: Outline, dy: number, wall: number): Out
     stroke.push([r * Math.cos(phi), r * Math.sin(phi) - dy]); // the body moves down relative to the Core when the Core moves up
   }
   const n = outline.phi.length;
-  const fit = fitOutlineFromStroke(stroke, wall, { fidelity: Math.min(1, Math.max(0, (n - 4) / 7)), mirror: !outline.left });
+  const fit = fitOutlineFromStroke(stroke, wall, { fidelity: Math.min(1, Math.max(0, (n - 4) / 7)), mirror: !outline.left, curve: outline.curve });
   if (!fit || fit.grew) return null;
   return { ...fit.outline, smooth: outline.smooth };
 }
