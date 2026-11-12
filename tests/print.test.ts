@@ -75,26 +75,6 @@ describe('3D print prototype export', () => {
     console.log('front cm3', (casing.frontVolume / 1000).toFixed(2), 'back cm3', (casing.backVolume / 1000).toFixed(2));
   }, 40000);
 
-  for (let ix = 0; ix < PRESETS.length; ix++) it(`${PRESETS[ix].id}: strap tunnel — a cord runs down one opening, under the bar and up the other; the bar and the outline are intact`, async () => {
-    const { casing, place } = await build(ix, {}, true);
-    expect(place.strap).not.toBeNull();
-    const st = place.strap!, S = CORE.strap, api = await getManifold(), M = api.Manifold;
-    expect(st.z1 + S.floor).toBeLessThanOrEqual(casing.splitOffset + 1e-6); // the whole tunnel sits in the back shell
-    for (const x of casing.print!.parts) expect(weldedProblems(x.mesh), x.name).toEqual({ open: 0, flipped: 0 });
-    const back = new api.Manifold(new api.Mesh({ numProp: 3, vertProperties: casing.back.positions.slice(), triVerts: casing.back.tris.slice() }));
-    const zc = (st.z0 + st.z1) / 2, r = Math.min(S.openingHeight, S.channelHeight) / 2 - 0.3;
-    const cyl = (len: number, at: [number, number, number], rot: [number, number, number]) => M.cylinder(len, r, r, 24, true).rotate(rot).translate(at);
-    // the cord: straight down into each opening, and along the channel between them
-    const cord = M.union([cyl(400, [-S.spacing / 2, st.yc, st.z0 - 200 + 1], [0, 0, 0]), cyl(400, [S.spacing / 2, st.yc, st.z0 - 200 + 1], [0, 0, 0]), cyl(S.spacing, [0, st.yc, zc], [0, 90, 0])]);
-    expect(back.intersect(cord).volume()).toBeLessThan(0.5); // nothing blocks the cord's path
-    const bar = M.cube([1, 1, 1], true).translate([0, st.yc, st.z0 - S.bar / 2]);
-    expect(back.intersect(bar).volume()).toBeGreaterThan(0.9); // the bar the cord wraps around is solid
-    const floor = M.cube([1, 1, 1], true).translate([0, st.yc, st.z1 + S.floor / 2]);
-    expect(back.intersect(floor).volume()).toBeGreaterThan(0.9); // and so is the floor under the channel
-    // nothing sticks out: the strap tunnel is inside the body
-    const plain = await build(ix, {}, true, false);
-    expect(bbox(casing.back).hi[1]).toBeCloseTo(bbox(plain.casing.back).hi[1], 1);
-  }, 40000);
 });
 
 describe('print prototype across the built-in shapes', () => {
@@ -123,8 +103,8 @@ describe('every STL output is watertight for slicers (root guard for all exports
   }
 });
 
-describe('strap tunnel search always ends', () => {
-  it('a body too shallow for the tunnel gets none (and the sanity check says so) instead of searching forever', () => {
+describe('strap hole search always ends', () => {
+  it('a body too shallow for the holes gets none (and the sanity check says so) instead of searching forever', () => {
     const pr = PRESETS[0], params = { ...presetParams(pr), depth: 12, splitZ: 0 } as any;
     const a = buildAll(clampOutline(pr.outline, params.wall), params, 2);
     expect(a.place.strap).toBeNull();

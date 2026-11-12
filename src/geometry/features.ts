@@ -25,8 +25,8 @@ export type Placement = {
   eyes: (SurfaceHit | null)[];
   puck: SurfaceHit | null;       // front surface at the puck center
   backZ: number | null;          // back surface z at the puck center
-  /** the strap tunnel on the back: two slot openings (surface points) joined by a channel inside; z0..z1 is the channel's height */
-  strap: { yc: number; center: Vector3; openings: Vector3[]; z0: number; z1: number } | null;
+  /** the strap holes on the back: two slots (surface points) straight through the back wall into the hollow; `zTop` is where the cut stops (just inside the cavity) */
+  strap: { yc: number; center: Vector3; openings: Vector3[]; zTop: number } | null;
 };
 
 /** margin (mm) kept between the core seat wall and an eye */
@@ -44,33 +44,33 @@ export function strapPill(w: number, h: number, seg = 16): [number, number][] {
 }
 
 /**
- * Finds where the strap tunnel fits: on the back, on the centre line, as high up as it can go. It needs the back surface at both openings,
- * then a bar of plastic, the channel, and a floor, all before the seam (so it lives in the back shell), clear of the Core seat and the body's rim.
- * Adapts to any shape; null when there is no room (the sanity check then says so).
+ * Finds where the two strap holes fit: on the back, on the centre line, as high up as they can go. Each hole must sit on a stretch of back that faces
+ * (nearly) straight back (so a vertical cut is a clean hole, no long slanted slot), stay on the body with a margin around it, clear of the Core seat,
+ * and leave `inside` mm of hollow behind the wall for the cord. Adapts to any shape; null when there is no room (the sanity check then says so).
  */
 export function findStrap(bvh: MeshBVH, geo: BufferGeometry, p: Params, shiftY: number, puckZ: number | null): Placement['strap'] {
-  const S = CORE.strap, seam = p.splitZ * p.depth, hw = S.openingWidth / 2, hh = S.openingHeight / 2;
+  const S = CORE.strap, seam = p.splitZ * p.depth, hw = S.openingWidth / 2, hh = S.openingHeight / 2, minNz = Math.cos((S.maxTiltDeg * Math.PI) / 180);
   const xs = [-S.spacing / 2, S.spacing / 2], reachX = S.spacing / 2 + hw + S.padMargin;
   geo.computeBoundingBox(); const top = geo.boundingBox!.max.y;
-  const backAt = (x: number, y: number) => { const h = castSurface(bvh, geo, new Vector3(x, y, -300), new Vector3(0, 0, 1)); return h ? h.point.z : null; };
-  // the Core's seat and its magnet pockets only reach into the back shell on deep seats; when they do, keep the tunnel clear of the seat's wall
+  const back = (x: number, y: number) => castSurface(bvh, geo, new Vector3(x, y, -300), new Vector3(0, 0, 1));
+  // the Core's seat and its magnet pockets only reach into the back shell on deep seats; when they do, keep the holes clear of the seat's wall
   const seatBottom = puckZ === null ? -Infinity : puckZ - CORE.puckDepth - floorThickness() - 0.4;
   const seatMin = seatBottom > seam ? -Infinity : shiftY + seatRadius() + p.wall + 1 + hh + S.padMargin;
   const yMin = Math.max(seatMin, geo.boundingBox!.min.y + hh + S.padMargin); // never search below the body itself (an unbounded search would never end)
+  const room = (zb: number) => seam - (zb + p.wall * 1.2) >= S.inside; // hollow left behind the wall, before the seam
   for (let yc = top - 1; yc >= yMin; yc -= 0.5) {
     // cheap first look (one ray): up near the top the back curves away, so most heights fail the depth test right here (this runs on every drag frame)
-    const zMid = backAt(0, yc);
-    if (zMid === null || zMid + S.bar + S.channelHeight + S.floor - 2 > seam) continue;
-    // the back surface at the openings' corners and centres, and a little beyond them (the pad around the tunnel must stay on the body)
-    let zb = -Infinity, ok = true;
-    for (const x of [-reachX, xs[0] - hw, xs[0], xs[1], xs[1] + hw, reachX]) for (const y of [yc - hh - S.padMargin, yc - hh, yc, yc + hh, yc + hh + S.rimMargin]) {
-      const z = backAt(x, y); if (z === null) { ok = false; break; }
-      if (Math.abs(y - yc) <= hh && Math.abs(x) <= xs[1] + hw) zb = Math.max(zb, z);
+    const mid = back(0, yc);
+    if (!mid || !room(mid.point.z - 2)) continue;
+    // the back at both holes' corners and centres (it must face back, within the tilt limit), and a margin beyond them (the body must still be there)
+    let zbMax = -Infinity, ok = true;
+    for (const x of [-reachX, xs[0] - hw, xs[0], xs[0] + hw, xs[1] - hw, xs[1], xs[1] + hw, reachX]) for (const y of [yc - hh - S.padMargin, yc - hh, yc, yc + hh, yc + hh + S.rimMargin]) {
+      const h = back(x, y); if (!h) { ok = false; break; }
+      const inHole = Math.abs(y - yc) <= hh + 1e-6 && (Math.abs(x - xs[0]) <= hw + 1e-6 || Math.abs(x - xs[1]) <= hw + 1e-6);
+      if (inHole) { zbMax = Math.max(zbMax, h.point.z); if (-h.normal.z < minNz) { ok = false; break; } }
     }
-    if (!ok) continue;
-    const z0 = zb + S.bar, z1 = z0 + S.channelHeight;
-    if (z1 + S.floor > seam) continue; // not enough body behind the seam here: try lower
-    return { yc, center: new Vector3(0, yc, zb), openings: xs.map((x) => new Vector3(x, yc, backAt(x, yc) ?? zb)), z0, z1 };
+    if (!ok || !room(zbMax)) continue;
+    return { yc, center: new Vector3(0, yc, mid.point.z), openings: xs.map((x) => new Vector3(x, yc, back(x, yc)?.point.z ?? mid.point.z)), zTop: zbMax + p.wall * 1.5 + 1 };
   }
   return null;
 }

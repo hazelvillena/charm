@@ -148,7 +148,10 @@ export class OutlineEditor {
     for (const it of this.refItems) add('it:' + it.id, it.name);
     this.refSel.value = [...this.refSel.options].some((o) => o.value === cur) ? cur : 'none'; this.refMode = this.refSel.value;
   }
-  private setRef(v: string) { this.refMode = v; this.render(); this.onRef?.(v === 'original'); }
+  private setRef(v: string) { this.refMode = v; this.render(); this.onRef?.(v === 'original'); this.onRefMode(v); }
+  /** the reference picked (the side canvas follows it); called when the choice changes */
+  onRefMode: (mode: string) => void = () => {};
+  get reference() { return this.refMode; }
   /** the outlines of the library, to pick as a reference */
   setReferences(items: { id: string; name: string; outline: Outline }[]) { this.refItems = items; this.fillRefOptions(); this.render(); }
   /** this iteration as it was loaded or last saved */

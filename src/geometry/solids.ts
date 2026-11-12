@@ -98,7 +98,7 @@ export async function buildCasing(input: {
     if (print) run('rim band', () => {
       // front half: the full band. Back half: only the outer half of the band down to the rebate's floor, then the full band below it
       // (so the rebate is simply left empty: nothing has to be cut out afterwards). The front shell carries the lap, so the back shell's
-      // seam face is what lies on the plate (the strap flap sits flush with it)
+      // seam face is what lies on the plate: both shells print seam face down (the outside surfaces face up, clean; any supports sit inside the hollow)
       const full = track(track(seam!.subtract(track(seam!.offset(-T, 'Round')))).subtract(cupDisc!));
       const outerHalf = track(track(seam!.subtract(track(seam!.offset(-(T / 2 - lc / 2), 'Round')))).subtract(cupDisc!));
       const prism = (cs: typeof full, z0: number, z1: number) => track(track(cs.extrude(z1 - z0)).translate([0, 0, splitOffset + z0]));
@@ -110,22 +110,14 @@ export async function buildCasing(input: {
       keepOut.push(track(M.cylinder(zFront + PUCK_HEAD - zFloor, sr, sr, 72, false).translate([cx, cy, zFloor])));
       keepOut.push(track(M.cube([CORE.notch.width, CORE.notch.depth + 0.6, zFront + PUCK_HEAD - zFloor], false).translate([cx - CORE.notch.width / 2, cy - sr - CORE.notch.depth, zFloor])));
     });
-    // the strap tunnel (every shape, back shell): a solid column from the back surface down to the seam holds it, so it prints from the plate
-    // up with no overhang; two vertical slots (they print clean) are joined by a channel under a bar the cord wraps around
-    let strapCut: Manifold | null = null, stubCut: Manifold | null = null;
-    if (place.strap) run('strap tunnel', () => {
-      const S = CORE.strap, st = place.strap!, hw = S.openingWidth / 2, ex = (poly: [number, number][], z0: number, z1: number, dx = 0) =>
+    // the strap holes (every shape, back shell): two vertical slots straight through the back wall into the hollow. Nothing else is added: no column,
+    // no channel, so there is no bridge and no overhang, and a cord runs inside the shell from one hole to the other
+    let strapCut: Manifold | null = null;
+    if (place.strap) run('strap holes', () => {
+      const S = CORE.strap, st = place.strap!, ex = (poly: [number, number][], z0: number, z1: number, dx: number) =>
         track(track(track(new api.CrossSection([poly.map(([x, y]): [number, number] => [x + dx, y + st.yc])])).extrude(z1 - z0)).translate([0, 0, z0]));
-      const padW = S.spacing + S.openingWidth + 2 * S.padMargin, padH = S.openingHeight + 2 * S.padMargin, r = Math.min(padH / 2, 3);
-      const pad = track(track(C.square([padW - 2 * r, padH - 2 * r], true).offset(r, 'Round', 2, 24)).translate([0, st.yc]));
-      // the column runs 0.6 mm past the seam plane so the split never lands exactly on its top face (coincident faces leave sliver edges);
-      // the little stub that ends up in the front shell is cut away again after the split
-      fills.push(track(track(pad.extrude(splitOffset + 200.6)).translate([0, 0, -200])));
-      stubCut = track(track(pad.extrude(1.6)).translate([0, 0, splitOffset - 0.5]));
-      keepOut.push(track(track(track(pad.offset(lc, 'Round')).extrude(L + 2)).translate([0, 0, splitOffset - L - 1]))); // the lap stays clear of the column
-      const slot = strapPill(S.openingWidth, S.openingHeight), channel = strapPill(S.spacing + S.openingWidth, S.openingHeight);
-      strapCut = track(M.union([ex(slot, -200, st.z0 + 0.5, -S.spacing / 2), ex(slot, -200, st.z0 + 0.5, S.spacing / 2), ex(channel, st.z0, st.z1)] as any[]));
-      void hw;
+      const slot = strapPill(S.openingWidth, S.openingHeight);
+      strapCut = track(M.union([ex(slot, -200, st.zTop, -S.spacing / 2), ex(slot, -200, st.zTop, S.spacing / 2)] as any[]));
     });
     let shell = run('hollow shell', () => track(outer.subtract(fills.length ? track(inner.subtract(track(M.union(fills as any[])))) : inner)));
     if (strapCut) { const cut = strapCut as Manifold; shell = run('strap cut', () => track(shell.subtract(cut))); }
@@ -206,7 +198,7 @@ export async function buildCasing(input: {
 
     // print prototype: half-lap seam (the front shell's inner half reaches into a rebate in the back shell), engraved eyes, flat layout
     let printOut: Casing['print'];
-    let frontF = stubCut ? run('strap stub', () => track(frontM.subtract(stubCut as Manifold))) : frontM, backF = backM;
+    let frontF = frontM, backF = backM;
     if (print) {
       const lapped = run('half-lap seam', () => {
         const keep = track(M.union(keepOut as any[]));
@@ -249,7 +241,7 @@ export async function buildCasing(input: {
       frontF = run('tidy front', () => track(frontF.simplify(PRINT.tidy)));
       backF = run('tidy back', () => track(backF.simplify(PRINT.tidy)));
       printOut = run('print layout', () => ({
-        parts: layoutFlat([{ name: 'Front shell', mesh: extract(frontF) }, { name: 'Back shell', mesh: extract(backF) }, { name: 'Core (fit dummy)', mesh: parts.core }], PRINT.gap),
+        parts: layoutFlat([{ name: 'Front shell', mesh: extract(frontF) }, { name: 'Back shell', mesh: extract(backF), flip: true }, { name: 'Core (fit dummy)', mesh: parts.core }], PRINT.gap),
       }));
     }
 

@@ -10,6 +10,7 @@ import { placeFeatures, Placement } from './geometry/features';
 import { SceneView } from './scene/scene';
 import { buildReferenceGhost } from './scene/referenceGhost';
 import { cloneOutline, clampOutline, scaleOutline } from './params/outline';
+import { PRESETS, presetParams } from './params/presets';
 import { blendOutlines } from './params/outlineEdit';
 import { cloneSide, lerpSide, defaultSide } from './params/side';
 import { Params, SCHEMA } from './params/schema';
@@ -392,9 +393,9 @@ window.addEventListener('keydown', (e) => {
 });
 editor.onChange = (o, final) => { store.state.outline = o; modified(); if (final) commit(); };
 // revert: each canvas goes back to how it was when this iteration was loaded or last saved
-let baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) };
+let baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side), params: { ...store.state.params, side: cloneSide(store.state.params.side) } as Params };
 editor.setSaved(baseline.outline);
-const captureBaseline = () => { baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) }; editor.setSaved(baseline.outline); };
+const captureBaseline = () => { baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side), params: { ...store.state.params, side: cloneSide(store.state.params.side) } as Params }; editor.setSaved(baseline.outline); updateSideReference(); };
 editor.onEye = (idx, x, yRel, final) => { // drag an eye on the canvas: the pair moves together, independent of the Core
   const p = store.state.params, half = p.eyeSpacing / 2, c = p.eyes === 'two' ? (idx === 0 ? x + half : x - half) : x;
   p.eyeX = Math.min(25, Math.max(-25, Math.round(c * 10) / 10));
@@ -409,6 +410,20 @@ panel.onSize = (axis, mm, final) => {
   editor.set(o, store.state.params.wall); editor.onChange(o, final);
   if (final) { sizeBase = null; panel.setSize(lastBody.w, lastBody.h); }
 };
+// the reference outline also shows on the side canvas: the chosen iteration's built body, side on (cached: building one takes a moment)
+const sideRefCache = new Map<string, ReturnType<typeof sideProfileOf>>();
+function updateSideReference() {
+  const mode = editor.reference; let src: { outline: ReturnType<typeof cloneOutline>; params: Params } | null = null;
+  if (mode === 'saved') src = { outline: baseline.outline, params: baseline.params };
+  else if (mode === 'original') src = { outline: PRESETS[0].outline, params: presetParams(PRESETS[0]) };
+  else if (mode.startsWith('it:')) { const it = library.get(mode.slice(3)); if (it) src = { outline: it.outline, params: { ...it.params, ...globalsNow() } as Params }; }
+  if (!src) { sideEditor.setReference(null); return; }
+  const key = JSON.stringify([mode, src.outline, src.params]);
+  let prof = sideRefCache.get(key);
+  if (!prof) { try { const ev = evaluateIteration(engine, src.outline, src.params); if (ev) { prof = sideProfileOf(ev.positions, engine.smoothFaces(2)); if (sideRefCache.size > 12) sideRefCache.clear(); sideRefCache.set(key, prof); } } catch { /* no reference */ } }
+  sideEditor.setReference(prof ?? null);
+}
+editor.onRefMode = () => updateSideReference();
 editor.onReset = () => { const o = cloneOutline(baseline.outline); editor.set(o, store.state.params.wall); editor.onChange(o, true); };
 sideEditor.onReset = () => { const sd = cloneSide(baseline.side); sideEditor.onChange(sd, true); };
 editor.onRef = (show) => {
@@ -484,7 +499,7 @@ function animateTo(toOutline: Outline, toParams: Params, meta: { name: string; l
 }
 
 // ---- library: saved iterations, live-updated when the global params change ----
-const syncReferences = () => editor.setReferences(library.items.map((i) => ({ id: i.id, name: i.name, outline: i.outline }))); // the canvas reference picker lists the library
+const syncReferences = () => { editor.setReferences(library.items.map((i) => ({ id: i.id, name: i.name, outline: i.outline }))); updateSideReference(); }; // the canvas reference picker lists the library
 const library = new Library(() => { libPanel.render(library.items); toolbar.setLibraryCount(library.items.length); renderChips(); syncReferences(); });
 syncReferences();
 function renderChips() { toolbar.setChips(library.starred().map((i) => ({ id: i.id, name: i.name })), store.state.libraryId); }

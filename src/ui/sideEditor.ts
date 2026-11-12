@@ -20,6 +20,7 @@ export class SideEditor {
   private side!: SideProfile;
   private zf = 17; private zb = 13; private H = 62; private cy = 25;
   private profile: SideProfileCurve | null = null;
+  private ref!: SVGPathElement; private refProfile: SideProfileCurve | null = null; // another iteration's silhouette, faint behind this one
   private active: Pick | null = null; private selected: Pick | null = null;
   private steppers: Record<SideWhich, ReturnType<typeof Pad.stepper>>;
   onChange: (s: SideProfile, final: boolean) => void = () => {};
@@ -29,13 +30,14 @@ export class SideEditor {
     this.pad = new Pad({ base: { cx: 0, cy: -31, w: 90, h: 90 }, label: 'Side profile, true to the 3D body. Drag points, click the outline to add one.', shape: 'tall' });
     this.s = this.pad.svg;
     this.axis = svg('line', { x1: 0, y1: 0, x2: 0, y2: -80, class: 'ui-pad-axis' }) as SVGLineElement;
+    this.ref = svg('path', { class: 'ui-pad-ref' }) as SVGPathElement; this.ref.style.display = 'none'; // the reference silhouette (faint, dashed)
     this.fill = svg('path', { class: 'ui-pad-fill quiet' }) as SVGPathElement;
     this.ink = svg('path', { class: 'ui-pad-result' }) as SVGPathElement; // the same black outline as the front canvas
     this.puck = svg('rect', { class: 'ui-pad-core', rx: 0.8 }) as SVGRectElement; this.puck.style.pointerEvents = 'none';
     this.frontNote = svg('text', { class: 'ui-pad-note' }) as SVGTextElement; this.frontNote.textContent = 'front';
     this.backNote = svg('text', { class: 'ui-pad-note', 'text-anchor': 'end' }) as SVGTextElement; this.backNote.textContent = 'back';
     this.groups = { back: svg('g') as SVGGElement, front: svg('g') as SVGGElement };
-    this.s.append(this.axis, this.fill, this.ink, this.puck, this.frontNote, this.backNote, this.groups.front, this.groups.back);
+    this.s.append(this.ref, this.axis, this.fill, this.ink, this.puck, this.frontNote, this.backNote, this.groups.front, this.groups.back);
     this.pad.view.onChange = () => this.render();
     this.pad.onRevert = () => this.onReset();
     this.pad.onDelete = () => this.deleteSelected();
@@ -55,6 +57,14 @@ export class SideEditor {
 
   /** the true side silhouette of the finished body (mm), measured from the 3D mesh */
   setProfile(p: SideProfileCurve) { this.profile = p; this.render(); }
+  /** another iteration's side silhouette (true mm, same frame), drawn faintly behind this one; null clears it */
+  setReference(p: SideProfileCurve | null) { this.refProfile = p && p.ys.length > 1 ? p : null; this.paintRef(); }
+  private paintRef() {
+    const p = this.refProfile; if (!p) { this.ref.style.display = 'none'; return; }
+    let d = ''; p.ys.forEach((y, i) => { d += `${i ? 'L' : 'M'}${(-p.front[i]).toFixed(2)} ${(-y).toFixed(2)}`; });
+    for (let i = p.ys.length - 1; i >= 0; i--) d += `L${(-p.back[i]).toFixed(2)} ${(-p.ys[i]).toFixed(2)}`;
+    this.ref.setAttribute('d', d + 'Z'); this.ref.style.display = '';
+  }
 
   private curve(which: SideWhich) { return new SideCurve(this.side[which], sideTs(this.side, which), this.side.smooth ?? 1); }
   private depth(which: SideWhich) { return which === 'back' ? this.zb : this.zf; }
