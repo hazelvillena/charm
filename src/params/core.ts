@@ -11,9 +11,9 @@ export const CORE = {
   magnet: { diameter: 5, thickness: 2, count: 2, spacing: 14, gap: 1.0 }, // gap = plastic floor between magnet and core, TBD
   notch: { width: 3, depth: 1.5 },   // fingernail release at the bottom of the seat, TBD
   // two plain strap holes through the back wall (a cord goes in one and out the other, through the hollow shell, and is knotted outside). Vertical slots: they print
-  // clean with no overhang or bridge. mm; sized for a printed prototype, TBD. `inside` = free depth wanted behind the wall for the cord; `maxTiltDeg` = how far the
+  // clean with no overhang or bridge. mm; sized for a printed prototype, TBD. `inside` = free depth wanted behind the wall for the cord (a 3 mm cord plus about 1.8 mm to spare, measured at every point of both holes); `maxTiltDeg` = how far the
   // back may lean from facing straight back where a hole goes (a steeper wall makes the hole a long slanted cut)
-  strap: { spacing: 7, openingWidth: 4, openingHeight: 3.2, padMargin: 2.5, rimMargin: 3, inside: 8, maxTiltDeg: 30 },
+  strap: { spacing: 7, openingWidth: 4, openingHeight: 3.2, padMargin: 2.5, rimMargin: 3, inside: 4.8, maxTiltDeg: 40 },
 };
 
 export type CoreKey = 'puckDiameter' | 'puckDepth' | 'domeHeight' | 'edgeRadius' | 'magnetGap';

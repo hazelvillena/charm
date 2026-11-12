@@ -47,8 +47,9 @@ describe('the two strap holes, on every shape', () => {
     }
     // 2. the finished shell: holes through the back wall; a cord (2.6 mm) goes down into one, across the hollow and out the other, touching neither shell
     const casing = await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params: it0.params, place: a.place, print: false });
+    const printed = await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params: it0.params, place: a.place, print: true }); // the print shells too: the rim band and the lap are in the cord's way if the holes are close to the seam
     const mk = (m: any) => new api.Manifold(new api.Mesh({ numProp: 3, vertProperties: m.positions.slice(), triVerts: m.tris.slice() }));
-    const back = mk(casing.back), front = mk(casing.front), r = Math.min(S.openingHeight / 2 - 0.3, 1.3), zc = st!.zTop + 0.3;
+    const back = mk(printed.back), front = mk(printed.front), r = Math.min(S.openingHeight / 2 - 0.3, 1.3), zc = st!.zTop + 0.3;
     const cyl = (len: number, at: [number, number, number], rot: [number, number, number]) => M.cylinder(len, r, r, 24, true).rotate(rot).translate(at);
     const cord = M.union([cyl(400, [-S.spacing / 2, st!.yc, zc - 200], [0, 0, 0]), cyl(400, [S.spacing / 2, st!.yc, zc - 200], [0, 0, 0]), cyl(S.spacing, [0, st!.yc, zc], [0, 90, 0])]);
     expect(back.intersect(cord).volume(), 'the cord passes the back shell').toBeLessThan(0.5);
@@ -59,7 +60,6 @@ describe('the two strap holes, on every shape', () => {
     expect(ceilingArea(casing.back, st!.yc) - ceilingArea(without.back, st!.yc), 'no new overhang for the holes').toBeLessThanOrEqual(2);
     expect(without.backVolume - casing.backVolume, 'the holes only remove material').toBeGreaterThan(0);
     // 4. the print set: both shells seam face down on the plate (flat), watertight
-    const printed = await buildCasing({ outerPos: a.outer, innerPos: a.inner, faces: a.faces, params: it0.params, place: a.place, print: true });
     const [fr, bk] = printed.print!.parts.map((x) => x.mesh);
     for (const x of printed.print!.parts) expect(meshHealth(x.mesh), `${it0.name} ${x.name}`).toEqual({ open: 0, flipped: 0 });
     expect(planeArea(bk, 0), 'the back shell lies on its seam ring, a real flat').toBeGreaterThan(200);
