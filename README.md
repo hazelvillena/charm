@@ -6,7 +6,7 @@ A browser tool for shaping a **Charmer**: draw a flat outline, get a soft SubD c
 
 ## What it does
 **Inputs (left)**
-1. **Shape**: drag mirrored outline points around the puck keep-out circle, or **Draw** a freehand outline that fits into the same points. Presets: Ghost (fitted from the original Charmer), Blob, Star, Cloud, Drop.
+1. **Shape**: drag outline points around the puck keep-out circle (mirrored by default, or **Mirror** off to shape each side on its own; hover the curve and click to add a point; drag the eyes on the canvas), or **Draw** it: click points one by one (the curve passes through them) or sketch freehand. Presets: Ghost (fitted from the original Charmer), Blob, Star, Cloud, Drop.
 2. **Side profile**: drag the back and front curves (back bulge, forward-leaning head).
 3. **Body, face, manufacturing** sliders, **Material** (PC/ABS, Silicone, Metal; finishes follow the material) with a color picker, and the **Core** (global: diameter, thickness, dome, edge radius, magnet gap).
 

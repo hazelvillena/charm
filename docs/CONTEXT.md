@@ -24,9 +24,9 @@ See the checklist in PLAN.md section 12 and the Log below. **v0 is built end to 
 - Messages are plain text (notes inline, status captions above the toolbar); never boxed chips.
 - **Core** (was AI puck): global, domed with rounded edge, magnets behind a 1 mm floor (ADR 0012). Global params = Core, wall, material, split; everything else is per-iteration (ADR 0015).
 - Materials drive finishes and weight (ADR 0013). Views: Shaded/Ghost/Section/Cage; Analyze menu: draft, curvature, zebra, wall (ADR 0014).
-- Outline: 4 to 12 points per side + smoothness; cage N = 10 (ADR 0016). Draw has a review step with fidelity/smoothing.
+- Outline: 4 to 12 points per side + smoothness; cage N = 10 (ADR 0016). Draw: Points (click-placed, the curve passes through them) or Freehand (review step with fidelity/smoothing). Eyes have their own position and can be dragged on the canvas.
 - Product name: **Clayground**. UI/material styling lives in `design/` only (ADR 0009).
-- Shape = outline (polar, mirrored) + **side profile** (ADR 0010). Ghost values are fitted from the reference; the puck plateau is flat by design.
+- Shape = outline (polar; mirrored, or independent halves with Mirror off, ADR 0025) + **side profile** (ADR 0010). Ghost values are fitted from the reference; the puck plateau is flat by design.
 - Layout: inputs left, live outputs right; below 1180 px outputs is a drawer, below 700 px both are drawers (no clipped controls).
 - Units mm, front +Z, up +Y, body stands on y = 0. Puck center C is the polar origin.
 - Core dims are placeholders (puck 1 inch). `REFERENCE_SCALE = 1.78`.

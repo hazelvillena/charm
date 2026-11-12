@@ -4,7 +4,7 @@ import { OUTLINE_MIN_GAP_DEG } from './core';
 
 const DEG = Math.PI / 180;
 export type StrokeFit = { outline: Outline; maxErrorMm: number; coverage: number; grew: boolean; points: number };
-export type FitOptions = { fidelity?: number }; // 0 = smooth / approximate (few points, heavy smoothing), 1 = faithful (many points, none)
+export type FitOptions = { fidelity?: number; mirror?: boolean }; // 0 = smooth / approximate (few points, heavy smoothing), 1 = faithful (many points, none)
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -42,39 +42,52 @@ export function fitOutlineFromStroke(stroke: [number, number][], wall: number, o
     const a = raw[(i - lo + 360) % 360], b = raw[(i + hi) % 360];
     R[i] = a + ((b - a) * lo) / (lo + hi);
   }
-  // light smoothing (circular moving average, 5 bins) then mirror-symmetrize about the vertical axis
+  // light smoothing (circular moving average, 5 bins) (then mirror-symmetrized about the vertical axis unless `mirror` is off)
   // gaussian smoothing (circular): hand jitter is removed unless fidelity is turned all the way up
   const sigma = lerp(6, 1.6, fid), rad = Math.ceil(sigma * 3), wts: number[] = [];
   for (let k = -rad; k <= rad; k++) wts.push(Math.exp(-0.5 * (k / sigma) ** 2));
   const wsum = wts.reduce((a, b) => a + b, 0);
   const sm = R.map((_, i) => { let acc = 0; for (let k = -rad; k <= rad; k++) acc += R[(i + k + 360) % 360] * wts[k + rad]; return acc / wsum; });
-  const sym = (deg: number) => { const d = ((Math.round(deg) % 360) + 360) % 360; return 0.5 * (sm[d] + sm[((180 - d) % 360 + 360) % 360]); };
+  const at = (deg: number) => sm[((Math.round(deg) % 360) + 360) % 360];
+  const mirror = opts.mirror !== false;
+  // per side, as a function of the right-half angle: mirrored = the two sides averaged, otherwise each side on its own (the left mirrored back)
+  const sideR = (deg: number) => (mirror ? 0.5 * (at(deg) + at(180 - deg)) : at(deg));
+  const sideL = (deg: number) => (mirror ? sideR(deg) : at(180 - deg));
 
-  // greedy choice of 7 right-half angles (incl. -90 and 90) that minimizes the worst deviation
+  // greedy choice of right-half angles (incl. -90 and 90) that minimizes the worst deviation, for one side
   const cand: number[] = []; for (let a = -85; a <= 85; a += 5) cand.push(a);
-  const fitFor = (angles: number[]) => {
-    const radii = angles.map((a) => sym(a));
-    const prof = new Profile(makeOutline(angles, radii));
-    let worst = 0, at = 0;
-    for (let a = -90; a <= 90; a++) { const e = Math.abs(prof.radius(a * DEG) - sym(a)); if (e > worst) { worst = e; at = a; } }
-    return { worst, at };
-  };
-  let angles = [-90, 90];
   const target = Math.round(lerp(4, 11, fid));
-  while (angles.length < target) {
-    const { at } = fitFor(angles);
-    let best: number | null = null, bd = Infinity;
-    for (const c of cand) {
-      if (angles.some((a) => Math.abs(a - c) < OUTLINE_MIN_GAP_DEG)) continue;
-      const d = Math.abs(c - at); if (d < bd) { bd = d; best = c; }
+  const fitHalf = (f: (deg: number) => number) => {
+    const fitFor = (angles: number[]) => {
+      const prof = new Profile(makeOutline(angles, angles.map(f)));
+      let worst = 0, at2 = 0;
+      for (let a = -90; a <= 90; a++) { const e = Math.abs(prof.radius(a * DEG) - f(a)); if (e > worst) { worst = e; at2 = a; } }
+      return { worst, at: at2 };
+    };
+    let angles = [-90, 90];
+    while (angles.length < target) {
+      const { at: worstAt } = fitFor(angles);
+      let best: number | null = null, bd = Infinity;
+      for (const c of cand) {
+        if (angles.some((a) => Math.abs(a - c) < OUTLINE_MIN_GAP_DEG)) continue;
+        const d = Math.abs(c - worstAt); if (d < bd) { bd = d; best = c; }
+      }
+      if (best === null) break;
+      angles = [...angles, best].sort((a, b) => a - b);
     }
-    if (best === null) break;
-    angles = [...angles, best].sort((a, b) => a - b);
+    return { angles, radii: angles.map(f) };
+  };
+  const RH = fitHalf(sideR), Lh = mirror ? RH : fitHalf(sideL);
+  let outline = makeOutline(RH.angles, RH.radii, 1 - 0.12 * fid);
+  if (!mirror) {
+    const top = 0.5 * (RH.radii[RH.radii.length - 1] + Lh.radii[Lh.radii.length - 1]), bottom = 0.5 * (RH.radii[0] + Lh.radii[0]); // the axis points are shared
+    outline.r[0] = bottom; outline.r[outline.r.length - 1] = top;
+    const lr = [...Lh.radii]; lr[0] = bottom; lr[lr.length - 1] = top;
+    outline.left = { phi: Lh.angles.map((a) => a * DEG), r: lr };
   }
-  const radii = angles.map((a) => sym(a));
-  const outline = clampOutline(makeOutline(angles, radii, 1 - 0.12 * fid), wall);
-  const grew = outline.r.some((r, i) => r > radii[i] + 0.05);
+  outline = clampOutline(outline, wall);
+  const grew = outline.r.some((r, i) => r > RH.radii[i] + 0.05) || (!!outline.left && outline.left.r.some((r, i) => r > Lh.radii[i] + 0.05));
   const prof = new Profile(outline);
-  let worst = 0; for (let a = -90; a <= 90; a++) worst = Math.max(worst, Math.abs(prof.radius(a * DEG) - sym(a)));
-  return { outline, maxErrorMm: worst, coverage, grew, points: angles.length };
+  let worst = 0; for (let a = -90; a <= 90; a++) { worst = Math.max(worst, Math.abs(prof.radius(a * DEG) - sideR(a))); if (!mirror) worst = Math.max(worst, Math.abs(prof.radius((180 - a) * DEG) - sideL(a))); }
+  return { outline, maxErrorMm: worst, coverage, grew, points: RH.angles.length + (mirror ? 0 : Lh.angles.length - 2) };
 }

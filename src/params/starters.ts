@@ -2,6 +2,7 @@ import { Outline, makeOutline } from './outline';
 import { Params, defaultParams } from './schema';
 import { Look } from '../../design/finishes';
 import { decodeShare } from '../io/share';
+import { PRESETS, presetParams } from './presets';
 
 /**
  * Starter iterations for a first-time library: smooth, abstract, analytic shapes (every outline is a smooth function of
@@ -23,8 +24,28 @@ const bump = (phi: number, at: number, w: number) => Math.exp(-(((phi - at * D) 
 const saved = (code: string): Starter => { const d = decodeShare(code)!; return { name: d.name, outline: d.outline, params: { ...d.params, eyeSize: Math.round(d.params.eyeSize * 10) / 10 }, look: d.look }; }; // (float noise in the code: 2.4000000000000004 is 2.4)
 const BLOB10 = 'eyJ2IjoyLCJwIjp7ImRlcHRoIjozMCwiYmVsbHkiOjAuNSwiYmFja0ZsYXQiOjAuNSwiY29yZVBsYXRlYXUiOmZhbHNlLCJwbGF0ZWF1IjowLjgsImV5ZXMiOiJ0d28iLCJleWVTaXplIjoyLjQwMDAwMDAwMDAwMDAwMDQsImV5ZVNwYWNpbmciOjQuNSwiZXllSGVpZ2h0IjowLjY1LCJleWVUeXBlIjoiaW5zZXQiLCJ3YWxsIjoxLjYsInNwbGl0WiI6MCwibWF0ZXJpYWwiOiJQQy9BQlMiLCJzaWRlIjp7ImJhY2siOlswLjMsMS4wOTA0NzM5Nzg0ODc3ODgyLDEuMzgwNDkyNDkyNzgwMzQ2MSwwLjg0NzQ0ODkyNDM1Njk5NjEsMC42NzUyMTE2MDU3MDQ1NTcxXSwiZnJvbnQiOlsxLjEyNTIwMTgzMzg0NDcyMzQsMSwxLDEsMSwxLDEuMjc0OTIzNzA3NjE2NDYxNV0sInNtb290aCI6MSwiYmFja1QiOlswLDAuMDgzOTg2MzY0Mzc2MDYzMiwwLjE3MjkzMjU4NzM0ODk3MjE2LDAuNTc4Njk4MzMzMTk3NDEwOCwxXX19LCJvIjp7InBoaSI6Wy0xLjU3MSwtMC42NzgsLTAuMDczLDAuMzc3LDAuODQzLDEuMTc4LDEuNTcxXSwiciI6WzIxLjA3NSwyMi45MiwyNS43OTEsMjcuNDg3LDI0LjkwMiwyNy45NywyOC4zOTVdLCJzIjoxfSwibCI6eyJjb2xvciI6IiNFNEU2RUEiLCJmaW5pc2giOiJnbG9zcyJ9LCJuIjoiQmxvYjEwIn0';
 
+/** the Charmer's inflation: its depth, belly, flat back and side profile, so a new shape rocks on its back the same way */
+const CHARMER = presetParams(PRESETS[0]);
+const inflated = { depth: CHARMER.depth, belly: CHARMER.belly, backFlat: CHARMER.backFlat, side: CHARMER.side };
+const WHITE: Look = { color: '#F4F5F7', finish: 'gloss' }; // PC, white, gloss
+
+/**
+ * Shuriken, traced from a pencil sketch (docs/sketches/shuriken-tile.jpg): a top point, a long right arm, a bottom point and a left corner,
+ * not mirrored. The outline is the sketch cast from the Core centre, scaled so the Core fits, with the arms widened just enough to keep
+ * the shell wall at 1.3 mm (a needle-thin tip is thinner than the wall) and the lower edge kept clear of the Core seat.
+ */
+const shuriken = (): Outline => {
+  const o = makeOutline([-90, -65, -45, -25, -5, 10.5, 25, 45, 62, 75, 90], [36, 24, 24, 24, 30, 44, 35, 28, 40, 46, 42]);
+  o.left = { phi: [-90, -72, -55, -40, -20, 0, 8.4, 25, 50, 75, 90].map((d) => d * D), r: [36, 44, 36, 24, 24, 27.1, 42, 38, 31, 33, 42] };
+  return o;
+};
+/** Tile, from the same sketch: a rounded square with the Core a little below centre (mirrored; the sketch's Core sat off to one side, centred here) */
+const tile = (): Outline => makeOutline([-90, -72, -58, -46, -32, 0, 32, 46, 58, 72, 90], [32.2, 33.9, 36.9, 36.8, 32.8, 27.8, 32.8, 39.4, 42.0, 40.0, 38.0]); // corner radius 13 mm
+
 export const STARTERS: Starter[] = [
   saved(BLOB10), // kept from the deployed app (Blob10): PC/ABS, gloss
+  { name: 'Shuriken', outline: shuriken(), params: { ...inflated, eyeHeight: 0.72, eyeSpacing: 4.7 }, look: WHITE },
+  { name: 'Tile', outline: tile(), params: { ...inflated, eyes: 'one', eyeHeight: 0.78 }, look: WHITE },
   // flat base, round top: nothing else in the library has a straight edge on the bottom
   { name: 'Arch', outline: polar((p) => { const flat = 21 / Math.max(1e-3, Math.abs(sinc(p))), k = 2.2, below = p < 0 ? -k * Math.log(Math.exp(-flat / k) + Math.exp(-30 / k)) : 30 - 3 * sinc(p) ** 2; return below; }, 11), params: { depth: 30, belly: 0.5, backFlat: 0.7, eyeHeight: 0.7 }, look: { color: '#F3EEE3', finish: 'matte' } },
   { name: 'Seed', outline: polar((p) => 20 + 13 * Math.abs(sinc(p)) ** 1.6, 9), params: { depth: 26, belly: 0.4, backFlat: 0.4, eyeHeight: 0.7 }, look: { color: '#A9C4F5', finish: 'gloss' } },
