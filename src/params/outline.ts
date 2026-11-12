@@ -2,8 +2,8 @@ import { OUTLINE_MAX_RADIUS, OUTLINE_MIN_GAP_DEG, outlineMinRadius } from './cor
 
 /**
  * Outline in polar form around the Core center C (the origin of the shape frame).
- * 4 to 12 control points on the right half, from bottom (-90 deg) to top (+90 deg), mirrored to the left, unless the outline
- * carries its own `left` half (not mirrored): then the left side has its own 4 to 12 points, measured the same way (mirrored angle),
+ * 4 to 24 control points on the right half, from bottom (-90 deg) to top (+90 deg), mirrored to the left, unless the outline
+ * carries its own `left` half (not mirrored): then the left side has its own 4 to 24 points, measured the same way (mirrored angle),
  * and the two axis points (bottom and top) are shared.
  * R(phi) is single-valued, so the outline can never fold or self-intersect: valid by construction.
  * `smooth` blends between straight segments (0, like degree 1) and a smooth cubic curve (1).
@@ -12,7 +12,7 @@ export type Half = { phi: number[]; r: number[] };
 export type Outline = { phi: number[]; r: number[]; smooth: number; left?: Half }; // phi in radians ascending -pi/2..pi/2; r in mm
 
 export const OUTLINE_MIN_POINTS = 4;
-export const OUTLINE_MAX_POINTS = 12;
+export const OUTLINE_MAX_POINTS = 24; // per side: enough to articulate a tight corner (a tip needs points a few degrees apart)
 const DEG = Math.PI / 180;
 
 export const cloneOutline = (o: Outline): Outline => ({ phi: [...o.phi], r: [...o.r], smooth: o.smooth ?? 1, ...(o.left ? { left: { phi: [...o.left.phi], r: [...o.left.r] } } : {}) });

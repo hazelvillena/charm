@@ -31,12 +31,15 @@ const WHITE: Look = { color: '#F4F5F7', finish: 'gloss' }; // PC, white, gloss
 
 /**
  * Shuriken, traced from a pencil sketch (docs/sketches/shuriken-tile.jpg): a top point, a long right arm, a bottom point and a left corner,
- * not mirrored. The outline is the sketch cast from the Core centre, scaled so the Core fits, with the arms widened just enough to keep
- * the shell wall at 1.3 mm (a needle-thin tip is thinner than the wall) and the lower edge kept clear of the Core seat.
+ * not mirrored. The sketch's outline was cast from the Core centre (0.11 mm per sketch pixel), its tips rounded to a 3 mm radius (a needle-thin
+ * tip is thinner than the shell wall) and its notches to 3 mm, the two edges that hugged the Core pushed out a little so the seat clears,
+ * then fitted with 18 points a side so the tips and corners stay articulated.
  */
 const shuriken = (): Outline => {
-  const o = makeOutline([-90, -65, -45, -25, -5, 10.5, 25, 45, 62, 75, 90], [36, 24, 24, 24, 30, 44, 35, 28, 40, 46, 42]);
-  o.left = { phi: [-90, -72, -55, -40, -20, 0, 8.4, 25, 50, 75, 90].map((d) => d * D), r: [36, 44, 36, 24, 24, 27.1, 42, 38, 31, 33, 42] };
+  const o = makeOutline([-90, -87.5, -77.5, -65, -45, -30, -2.5, 10, 15, 17.5, 20, 27.5, 45, 60, 65, 75, 80, 90],
+    [28.4, 27.1, 26, 25.6, 23.4, 24.1, 35.8, 43, 38.6, 32.6, 30.4, 26, 24.3, 29.1, 33.1, 45, 44.6, 39.6]);
+  o.left = { phi: [-90, -87.5, -80, -75, -70, -65, -45, -35, -22.5, -10, -2.5, 7.5, 22.5, 30, 50, 77.5, 85, 90].map((d) => d * D),
+    r: [28.4, 30.2, 40.4, 39.7, 36.3, 34.5, 30.9, 27, 25.7, 30.4, 38, 40.2, 35.6, 33.4, 31.2, 34.9, 37.4, 39.6] };
   return o;
 };
 /** Tile, from the same sketch: a rounded square with the Core a little below centre (mirrored; the sketch's Core sat off to one side, centred here) */

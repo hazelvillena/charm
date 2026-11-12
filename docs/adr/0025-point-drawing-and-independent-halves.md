@@ -12,7 +12,10 @@ Freehand drawing was fitted into a mirrored 4–11 point outline with heavy smoo
 - **Eyes are free of the Core**: a new `eyeX` (mm, across) and a wider `eyeHeight` range, and the eyes are draggable markers on the outline canvas (the pair moves together). They still keep clear of the Core seat.
 - **Starters**: Blob10 (kept from the deployed app, decoded from its share code), Shuriken and Tile (traced from `docs/sketches/shuriken-tile.jpg`, PC white gloss, with the Charmer's inflation: depth, belly, flat back and side profile, so they rock the same way). The library migrates existing users (v14, v15).
 
+- **Tight corners**: up to 24 points per side (was 12) and points may sit 2.5° apart (was 6°), so a tip or small-radius corner can be articulated. Freehand uses up to 18 points at full fidelity.
+- **Select several points**: Cmd/Ctrl/Alt-click toggles a point, Cmd/Ctrl/Alt-drag draws a selection box, Cmd/Ctrl+A selects all; dragging any selected point moves them together (spacing and Core clearance still apply), Delete removes them. Works in Edit and in Points draw. (Shift is taken: shift-drag pans the canvas.)
+
 ## Consequences
 - The outline is still one radius per angle around the Core (star-shaped), so a shape that folds back on itself can't be drawn; points that do not go around the Core are rejected.
-- The Shuriken's tips are widened from the sketch: a needle-thin tip is thinner than the shell wall (the Wall check) and the lower edge must clear the Core seat. The Tile's Core is centred (the sketch had it off to one side).
+- The Shuriken keeps the sketch's points, rounded to a 3 mm radius: a needle-thin tip is thinner than the shell wall (the Wall check), and the two edges that hugged the Core were pushed out so the seat clears. The Tile's Core is centred (the sketch had it off to one side).
 - Tests: `tests/asym.test.ts` (halves, points fit, freehand without mirror, watertight print of Blob10/Shuriken/Tile).

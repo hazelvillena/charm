@@ -10,6 +10,8 @@ import { fitOutlineFromStroke, StrokeFit } from '../params/fitOutline';
 
 const VB = 52; // viewBox half-size in mm
 const DEG = Math.PI / 180;
+/** the key that adds to a selection (shift is taken: shift-drag pans the canvas) */
+const multiKey = (e: { metaKey: boolean; ctrlKey: boolean; altKey: boolean }) => e.metaKey || e.ctrlKey || e.altKey;
 
 function pathOf(o: Outline, n = 240): string {
   const prof = new Profile(o); let d = '';
@@ -36,8 +38,12 @@ export class OutlineEditor {
   private showRef = false;
   private active = -1; private selected = -1; private activeSide: Side = 'R'; private selSide: Side = 'R';
   private mirror = true; private mirrorInput!: HTMLInputElement;
+  /** several points selected at once (Cmd/Ctrl-click, a Cmd/Ctrl-drag box, Cmd/Ctrl+A): keys like 'R:3' / 'L:5'; they move together */
+  private multi = new Set<string>(); private marquee: SVGRectElement; private marq: { x0: number; y0: number; add: boolean } | null = null;
+  private groupDrag: { x0: number; y0: number; pts: { side: Side; i: number; x: number; y: number }[] } | null = null;
   private drawKind: 'points' | 'freehand' = 'points';
   private kindSeg!: HTMLElement; private kindBtns: HTMLButtonElement[] = [];
+  private dsel = new Set<number>(); private dgroup: { x0: number; y0: number; orig: [number, number][] } | null = null; private dmarq: { x0: number; y0: number } | null = null;
   private dpts: [number, number][] = []; private dptDrag = -1; private dptsG: SVGGElement; private ptsCtl!: HTMLElement; private ptsInfo = h('span', { class: 'ui-tag-note fit-info' }); private ptsGen!: HTMLButtonElement;
   private mode: 'edit' | 'draw' = 'edit';
   private drawing = false;
@@ -61,7 +67,7 @@ export class OutlineEditor {
   onDrawn: (fit: StrokeFit | null) => void = () => {};
 
   constructor() {
-    this.pad = new Pad({ base: { cx: 0, cy: 0, w: VB * 2, h: VB * 2 }, label: 'Front outline. Drag points, click the curve to add, drag the core to move it.' });
+    this.pad = new Pad({ base: { cx: 0, cy: 0, w: VB * 2, h: VB * 2 }, label: 'Front outline. Drag points, click the curve to add, Cmd/Ctrl-click or Cmd/Ctrl-drag to select several, drag the core to move it.' });
     this.s = this.pad.svg;
     for (const r of [20, 40]) this.s.append(svg('circle', { cx: 0, cy: 0, r, class: 'ui-pad-ring' }));
     this.s.append(svg('line', { x1: -VB, y1: 0, x2: VB, y2: 0, class: 'ui-pad-axis' }), svg('line', { x1: 0, y1: -VB, x2: 0, y2: VB, class: 'ui-pad-axis' }));
@@ -74,19 +80,21 @@ export class OutlineEditor {
     this.handlesG = svg('g') as SVGGElement;
     this.eyesG = svg('g', { class: 'ui-pad-eyes' }) as SVGGElement;
     this.dptsG = svg('g', { class: 'ui-pad-dpts' }) as SVGGElement;
+    this.marquee = svg('rect', { class: 'ui-pad-marquee' }) as SVGRectElement; this.marquee.style.display = 'none';
     this.addHint = svg('circle', { class: 'ui-pad-addhint' }) as SVGCircleElement; this.addHint.style.display = 'none';
     this.preview = svg('path', { class: 'ui-pad-preview' }) as SVGPathElement;
     this.sketch = svg('path', { class: 'ui-pad-stroke' }) as SVGPathElement;
     this.hand = svg('g', { class: 'ui-pad-glyph' }) as SVGGElement;
     this.hand.append(svg('path', { d: 'M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15' }));
     this.issue = svg('circle', { class: 'ui-pad-issue' }) as SVGCircleElement; this.issue.style.display = 'none';
-    this.s.append(this.ref, this.keep, this.path, this.result, this.puckC, this.hand, this.keepLabel, this.eyesG, this.handlesG, this.addHint, this.issue, this.preview, this.sketch, this.dptsG);
+    this.s.append(this.ref, this.keep, this.path, this.result, this.puckC, this.hand, this.keepLabel, this.eyesG, this.handlesG, this.addHint, this.issue, this.preview, this.sketch, this.dptsG, this.marquee);
     this.pad.view.onChange = () => this.render();
     this.pad.onRevert = () => this.onReset();
     this.pad.onDelete = () => this.deleteSelected();
     this.s.addEventListener('keydown', (e) => {
       if (this.mode === 'draw' && this.drawKind === 'points') { if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.undoPoint(); } else if (e.key === 'Enter') { e.preventDefault(); this.generatePoints(); } else if (e.key === 'Escape') this.clearPoints(); return; }
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deleteSelected(); } else if (e.key === 'Escape') { this.select(-1); } });
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deleteSelected(); } else if (e.key === 'Escape') { this.select(-1); }
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAll(); } });
     this.s.addEventListener('pointerdown', (e) => { this.s.focus({ preventScroll: true }); this.onDown(e); });
     this.s.addEventListener('pointermove', (e) => this.onMove(e));
     this.s.addEventListener('pointerleave', () => { this.addHint.style.display = 'none'; });
@@ -208,16 +216,16 @@ export class OutlineEditor {
       this.dptsG.replaceChildren();
       for (const a of all) { const c = svg('circle', { class: 'ui-pad-dp' + (a.own < 0 ? ' mir' : '') }); if (a.own >= 0) (c as SVGElement).dataset.i = String(a.own); this.dptsG.append(c); }
     }
-    all.forEach((a, k) => { const c = this.dptsG.children[k]; c.setAttribute('cx', a.x.toFixed(2)); c.setAttribute('cy', (-a.y).toFixed(2)); c.setAttribute('r', ((a.own < 0 ? 2.2 : 3.4) * u * 1.6).toFixed(3)); });
+    all.forEach((a, k) => { const c = this.dptsG.children[k]; c.classList.toggle('sel', a.own >= 0 && this.dsel.has(a.own)); c.setAttribute('cx', a.x.toFixed(2)); c.setAttribute('cy', (-a.y).toFixed(2)); c.setAttribute('r', ((a.own < 0 ? 2.2 : 3.4) * u * 1.6).toFixed(3)); });
     if (!on) { if (!this.reviewing) this.preview.setAttribute('d', ''); return; }
     const fit = this.dpts.length >= 3 ? outlineFromPoints(this.dpts, this.wall, this.mirror) : null;
     this.preview.setAttribute('d', fit ? pathOf(fit.outline) : '');
     this.ptsGen.disabled = !fit;
     this.ptsInfo.textContent = !this.dpts.length ? 'Click to add points' : fit ? `${this.dpts.length} points${fit.grew ? ' · grew' : ''}${fit.dropped ? ` · ${fit.dropped} skipped` : ''}` : this.dpts.length < 3 ? `${this.dpts.length} points` : 'Go around the core';
-    this.ptsInfo.title = fit?.grew ? 'The outline grew to clear the core' : fit?.dropped ? 'Some points were too close to the next one and were skipped' : 'Place points around the core, then Generate. Drag a point to move it, Backspace removes the last';
+    this.ptsInfo.title = fit?.grew ? 'The outline grew to clear the core' : fit?.dropped ? 'Some points were too close to the next one and were skipped' : 'Place points around the core, then Generate. Drag a point to move it, Cmd/Ctrl-click or Cmd/Ctrl-drag to select several, Backspace removes the selected (or the last)';
   }
-  private undoPoint() { this.dpts.pop(); this.refreshPoints(); }
-  private clearPoints() { this.dpts = []; this.refreshPoints(); }
+  private undoPoint() { if (this.dsel.size) { this.dpts = this.dpts.filter((_, i) => !this.dsel.has(i)); this.dsel.clear(); } else this.dpts.pop(); this.refreshPoints(); } // removes the selected points, or the last one
+  private clearPoints() { this.dpts = []; this.dsel.clear(); this.refreshPoints(); }
   private generatePoints() {
     const fit = outlineFromPoints(this.dpts, this.wall, this.mirror); if (!fit) return;
     this.busy.classList.remove('hidden'); const t0 = performance.now();
@@ -230,16 +238,57 @@ export class OutlineEditor {
   private pointsDown(e: PointerEvent) {
     const [x, y] = this.toSvg(e), u = this.pad.unit();
     let hit = -1, best = 9 * u; this.dpts.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < best) { best = d; hit = i; } });
+    if (multiKey(e)) { // Cmd/Ctrl/Alt: toggle a point in the selection, or drag a box to select several
+      if (hit >= 0) { if (this.dsel.has(hit)) this.dsel.delete(hit); else this.dsel.add(hit); this.refreshPoints(); } else { this.dmarq = { x0: x, y0: y }; this.capture(e); }
+      return;
+    }
+    if (hit >= 0 && this.dsel.size > 1 && this.dsel.has(hit)) { this.dgroup = { x0: x, y0: y, orig: this.dpts.map((p) => [p[0], p[1]] as [number, number]) }; this.capture(e); return; }
+    this.dsel.clear();
     if (hit < 0) { this.dpts.push([x, y]); hit = this.dpts.length - 1; }
     this.dptDrag = hit; this.capture(e); this.refreshPoints();
   }
+  private pointsMove(e: PointerEvent) {
+    const [x, y] = this.toSvg(e);
+    if (this.dmarq) { const m = this.dmarq, x1 = Math.min(x, m.x0), x2 = Math.max(x, m.x0), y1 = Math.min(y, m.y0), y2 = Math.max(y, m.y0); this.marquee.setAttribute('x', x1.toFixed(2)); this.marquee.setAttribute('y', (-y2).toFixed(2)); this.marquee.setAttribute('width', (x2 - x1).toFixed(2)); this.marquee.setAttribute('height', (y2 - y1).toFixed(2)); this.marquee.style.display = ''; return; }
+    if (this.dgroup) { const g = this.dgroup; for (const i of this.dsel) this.dpts[i] = [g.orig[i][0] + x - g.x0, g.orig[i][1] + y - g.y0]; this.refreshPoints(); return; }
+    if (this.dptDrag >= 0) { this.dpts[this.dptDrag] = [x, y]; this.refreshPoints(); }
+  }
+  private pointsUp(e: PointerEvent) {
+    if (this.dmarq) {
+      const [x, y] = this.toSvg(e), m = this.dmarq, x1 = Math.min(x, m.x0), x2 = Math.max(x, m.x0), y1 = Math.min(y, m.y0), y2 = Math.max(y, m.y0);
+      this.dpts.forEach(([px, py], i) => { if (px >= x1 && px <= x2 && py >= y1 && py <= y2) this.dsel.add(i); });
+      this.dmarq = null; this.marquee.style.display = 'none';
+    }
+    this.dgroup = null; this.dptDrag = -1; this.refreshPoints();
+  }
 
   private paintSmooth() { this.smoothInput.style.setProperty('--p', `${this.outline.smooth * 100}%`); }
-  private select(i: number) { this.selected = i; this.render(); }
+  private key = (side: Side, i: number) => `${side}:${i}`;
+  /** the editable points as {side, index, x, y} in mm (y up) */
+  private editablePoints(): { side: Side; i: number; x: number; y: number }[] {
+    const o = this.outline, out: { side: Side; i: number; x: number; y: number }[] = [];
+    o.phi.forEach((p, i) => out.push({ side: 'R', i, x: o.r[i] * Math.cos(p), y: o.r[i] * Math.sin(p) }));
+    if (o.left) o.left.phi.forEach((p, i) => { if (i > 0 && i < o.left!.phi.length - 1) out.push({ side: 'L', i, x: -o.left!.r[i] * Math.cos(p), y: o.left!.r[i] * Math.sin(p) }); });
+    return out;
+  }
+  private select(i: number) { this.selected = i; this.multi.clear(); if (i >= 0) this.multi.add(this.key(this.selSide, i)); this.render(); }
+  private setMulti(keys: string[]) {
+    this.multi = new Set(keys);
+    if (keys.length === 1) { const [sd, i] = keys[0].split(':'); this.selSide = sd as Side; this.selected = +i; } else this.selected = -1;
+    this.render();
+  }
+  private selectAll() { if (this.mode !== 'edit' || !this.outline) return; this.setMulti(this.editablePoints().map((p) => this.key(p.side, p.i))); }
   private deleteSelected() {
-    if (this.selected < 0 || !this.outline) return;
+    if (!this.outline) return;
+    if (this.multi.size > 1) { // remove every selected interior point (the axis points stay), the last indices first
+      let o: Outline | null = this.outline, changed = false;
+      const picks = [...this.multi].map((k) => { const [sd, i] = k.split(':'); return { side: sd as Side, i: +i }; }).sort((a, b) => b.i - a.i);
+      for (const p of picks) { const r: Outline | null = removePoint(o!, p.i, this.wall, p.side); if (r) { o = r; changed = true; } }
+      if (!changed || !o) return; this.multi.clear(); this.selected = -1; this.outline = o; this.render(); this.onChange(o, true); return;
+    }
+    if (this.selected < 0) return;
     const o = removePoint(this.outline, this.selected, this.wall, this.selSide);
-    if (!o) return; this.selected = -1; this.outline = o; this.render(); this.onChange(o, true);
+    if (!o) return; this.selected = -1; this.multi.clear(); this.outline = o; this.render(); this.onChange(o, true);
   }
   private stepPoints(d: number) {
     const o = d > 0 ? addPointAuto(this.outline, this.wall) : removePointAuto(this.outline, this.wall);
@@ -264,7 +313,16 @@ export class OutlineEditor {
     const eye = target.closest('.ui-pad-eye') as SVGElement | null;
     if (eye) { this.eyeDrag = +eye.dataset.i!; eye.classList.add('drag'); this.capture(e); e.preventDefault(); return; }
     const pt = target.closest('.ui-pad-pt:not(.mirror)') as SVGGElement | null;
-    if (pt) { this.active = +pt.dataset.i!; this.activeSide = (pt.dataset.side as Side) ?? 'R'; this.selected = this.active; this.selSide = this.activeSide; this.render(); pt.classList.add('drag'); this.capture(e); e.preventDefault(); return; }
+    if (pt) {
+      const side = (pt.dataset.side as Side) ?? 'R', i = +pt.dataset.i!, k = this.key(side, i);
+      if (multiKey(e)) { const keys = new Set(this.multi); if (this.selected >= 0) keys.add(this.key(this.selSide, this.selected)); if (keys.has(k)) keys.delete(k); else keys.add(k); this.setMulti([...keys]); e.preventDefault(); return; }
+      if (this.multi.size > 1 && this.multi.has(k)) { // drag the whole selection
+        const [x0, y0] = this.toSvg(e), all = this.editablePoints();
+        this.groupDrag = { x0, y0, pts: all.filter((p) => this.multi.has(this.key(p.side, p.i))) }; this.capture(e); e.preventDefault(); return;
+      }
+      this.active = i; this.activeSide = side; this.selected = i; this.selSide = side; this.multi.clear(); this.multi.add(k); this.render(); pt.classList.add('drag'); this.capture(e); e.preventDefault(); return;
+    }
+    if (multiKey(e)) { const [x0, y0] = this.toSvg(e); this.marq = { x0, y0, add: true }; this.capture(e); e.preventDefault(); return; } // a box to select points
     if (target.classList.contains('ui-pad-core') || target.closest('.ui-pad-glyph')) { // the Core: drag it up or down inside the body
       this.coreDrag = { y0: e.clientY, outline0: cloneOutline(this.outline), cx: this.pad.view.center[0], cy: this.pad.view.center[1] };
       this.s.classList.add('moving-core'); this.capture(e); e.preventDefault(); return;
@@ -293,8 +351,19 @@ export class OutlineEditor {
 
   private onMove(e: PointerEvent) {
     this.showAddHint(e);
-    if (this.mode === 'draw' && this.drawKind === 'points') { if (this.dptDrag >= 0) { const [x, y] = this.toSvg(e); this.dpts[this.dptDrag] = [x, y]; this.refreshPoints(); } return; }
+    if (this.mode === 'draw' && this.drawKind === 'points') { this.pointsMove(e); return; }
     if (this.mode === 'draw') { if (this.drawing) this.addStrokePoint(e); return; }
+    if (this.marq) { const [x, y] = this.toSvg(e); const x1 = Math.min(x, this.marq.x0), x2 = Math.max(x, this.marq.x0), y1 = Math.min(y, this.marq.y0), y2 = Math.max(y, this.marq.y0); this.marquee.setAttribute('x', x1.toFixed(2)); this.marquee.setAttribute('y', (-y2).toFixed(2)); this.marquee.setAttribute('width', (x2 - x1).toFixed(2)); this.marquee.setAttribute('height', (y2 - y1).toFixed(2)); this.marquee.style.display = ''; return; }
+    if (this.groupDrag) {
+      const [x, y] = this.toSvg(e), dx = x - this.groupDrag.x0, dy = y - this.groupDrag.y0, o = cloneOutline(this.outline);
+      for (const p of this.groupDrag.pts) {
+        const h = p.side === 'L' && o.left ? o.left : o, n = h.phi.length;
+        const ax = Math.abs(p.x + dx), yy = p.y + dy, phi = Math.atan2(yy, ax), r = Math.hypot(ax, yy); // either side is measured mirrored, like a single drag
+        if (p.i === 0 || p.i === n - 1) { h.r[p.i] = r; if (o.left) (h === o ? o.left : o).r[p.i === 0 ? 0 : (h === o ? o.left : o).r.length - 1] = r; }
+        else { h.phi[p.i] = phi; h.r[p.i] = r; }
+      }
+      this.outline = clampOutline(o, this.wall); this.render(); this.onChange(this.outline, false); return;
+    }
     if (this.eyeDrag >= 0) { const [x, y] = this.toSvg(e); this.onEye(this.eyeDrag, x, y, false); return; }
     if (this.coreDrag) {
       const u = this.pad.unit(), dy = (this.coreDrag.y0 - e.clientY) * u; // mm the Core has moved up
@@ -316,8 +385,15 @@ export class OutlineEditor {
 
   private onUp(e: PointerEvent) {
     try { this.s.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    if (this.mode === 'draw' && this.drawKind === 'points') { this.dptDrag = -1; this.refreshPoints(); return; }
+    if (this.mode === 'draw' && this.drawKind === 'points') { this.pointsUp(e); return; }
     if (this.mode === 'draw') { this.finishStroke(); return; }
+    if (this.marq) {
+      const [x, y] = this.toSvg(e), x1 = Math.min(x, this.marq.x0), x2 = Math.max(x, this.marq.x0), y1 = Math.min(y, this.marq.y0), y2 = Math.max(y, this.marq.y0);
+      const keys = new Set(this.multi); if (this.selected >= 0) keys.add(this.key(this.selSide, this.selected));
+      for (const p of this.editablePoints()) if (p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2) keys.add(this.key(p.side, p.i));
+      this.marq = null; this.marquee.style.display = 'none'; this.setMulti([...keys]); return;
+    }
+    if (this.groupDrag) { this.groupDrag = null; this.onChange(this.outline, true); return; }
     if (this.eyeDrag >= 0) { const [x, y] = this.toSvg(e); this.eyesG.querySelector('.drag')?.classList.remove('drag'); const i = this.eyeDrag; this.eyeDrag = -1; this.onEye(i, x, y, true); return; }
     if (this.coreDrag) { this.coreDrag = null; this.s.classList.remove('moving-core'); this.onChange(this.outline, true); return; }
     if (this.active < 0) return;
@@ -393,8 +469,10 @@ export class OutlineEditor {
         this.hand.setAttribute('transform', `scale(${(14 / 24 * u).toFixed(4)}) translate(-12 -12)`);
     const selN = this.selSide === 'L' && own ? m : n;
     if (this.selected >= selN) this.selected = -1;
-    Array.from(this.handlesG.children).forEach((el) => { const g = el as SVGGElement; g.classList.toggle('sel', !g.classList.contains('mirror') && +g.dataset.i! === this.selected && (g.dataset.side ?? 'R') === this.selSide); });
-    this.pad.setCanDelete(this.selected > 0 && this.selected < selN - 1 && selN > OUTLINE_MIN_POINTS);
+    if (!own) for (const k of [...this.multi]) if (k.startsWith('L:')) this.multi.delete(k);
+    Array.from(this.handlesG.children).forEach((el) => { const g = el as SVGGElement; g.classList.toggle('sel', !g.classList.contains('mirror') && this.multi.has(this.key((g.dataset.side as Side) ?? 'R', +g.dataset.i!))); });
+    this.pad.setCanDelete(this.multi.size > 1 ? [...this.multi].some((k) => { const [sd, i] = k.split(':'); const len = sd === 'L' && own ? m : n; return +i > 0 && +i < len - 1; }) && Math.min(n, own ? m : n) > OUTLINE_MIN_POINTS
+      : this.selected > 0 && this.selected < selN - 1 && selN > OUTLINE_MIN_POINTS);
     this.paintIssue(); this.paintEyes();
     this.points.set(n, OUTLINE_MIN_POINTS, OUTLINE_MAX_POINTS);
     this.smoothInput.value = String(this.outline.smooth); this.paintSmooth();

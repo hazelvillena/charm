@@ -23,8 +23,10 @@
 .ui-pad-eye.drag { cursor: grabbing; fill: var(--accent-ink); }
 .ui-pad-addhint { fill: var(--surface); stroke: var(--accent); stroke-width: var(--pad-line); stroke-dasharray: 2 1.5; pointer-events: none; opacity: 0.9; }
 .ui-pad-dp { fill: var(--accent); stroke: var(--surface); stroke-width: var(--pad-hair); pointer-events: none; }
+.ui-pad-dp.sel { fill: var(--accent-ink); stroke: var(--ink); stroke-width: var(--pad-line); }
 .ui-pad-dp.mir { fill: var(--accent); fill-opacity: 0.35; }
 .ui-pad-svg.pointing { cursor: crosshair; }
+.ui-pad-marquee { fill: var(--accent); fill-opacity: 0.08; stroke: var(--accent); stroke-width: var(--pad-hair); stroke-dasharray: 3 2; pointer-events: none; }
 .ui-pad-note { font-size: 3px; fill: var(--ink-3); pointer-events: none; }
 .ui-pad-note.bad { fill: var(--bad); }
 .ui-pad-result { fill: none; stroke: var(--ink); stroke-width: 1.4px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }

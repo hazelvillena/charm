@@ -38,7 +38,7 @@ export const resetCore = () => setCore(DEFAULTS);
 
 export const OUTLINE_MARGIN = 1.5; // mm of extra material beyond puck + clearance + wall
 export const OUTLINE_MAX_RADIUS = 60;
-export const OUTLINE_MIN_GAP_DEG = 6;
+export const OUTLINE_MIN_GAP_DEG = 2.5; // closest two outline points may sit (small, so tips and corners can be tight)
 
 export const puckRadius = () => CORE.puckDiameter / 2;
 export const seatRadius = () => CORE.puckDiameter / 2 + CORE.puckClearance;

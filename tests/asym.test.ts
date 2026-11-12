@@ -55,6 +55,17 @@ describe('outlines with their own left half', () => {
   });
 });
 
+describe('tight corners', () => {
+  it('allows up to 24 points a side, 2.5 degrees apart, so a tip can be articulated', () => {
+    const angles = Array.from({ length: 24 }, (_, i) => -90 + (180 * i) / 23), o = makeOutline(angles, angles.map((_, i) => (i % 2 ? 30 : 28)));
+    expect(isOutlineValid(o)).toBe(true);
+    const tip = makeOutline([-90, -40, 20, 27.5, 30, 32.5, 40, 90], [28, 28, 28, 36, 44, 36, 28, 28]);
+    const c = clampOutline(tip, 1.6); c.phi.forEach((p, i) => { if (i) expect(p - c.phi[i - 1]).toBeGreaterThanOrEqual(2.5 * DEG - 1e-9); });
+    expect(c.phi[4]).toBeCloseTo(30 * DEG, 6); // the tip keeps its place
+    const prof = new Profile(c); expect(prof.radius(30 * DEG)).toBeGreaterThan(43);
+  });
+});
+
 describe('outline from clicked points', () => {
   const ring = (n: number, r: (deg: number) => number): [number, number][] => Array.from({ length: n }, (_, i) => { const d = -170 + (340 * i) / (n - 1); return pol(d, r(d)); });
   it('passes through the clicked points (mirrored: folded onto the right half)', () => {
@@ -79,7 +90,7 @@ describe('outline from clicked points', () => {
     expect(outlineFromPoints([pol(0, 30), pol(30, 30)], 1.6, true)).toBeNull();
     expect(outlineFromPoints([pol(10, 30), pol(20, 30), pol(30, 30), pol(40, 30)], 1.6, false)).toBeNull(); // all on one side
     const crowded = ring(40, () => 30), fit = outlineFromPoints(crowded, 1.6, true)!;
-    expect(fit.outline.phi.length).toBeLessThanOrEqual(12); expect(isOutlineValid(fit.outline)).toBe(true);
+    expect(fit.outline.phi.length).toBeLessThanOrEqual(24); expect(isOutlineValid(fit.outline)).toBe(true);
   });
   it('very small clicks grow to clear the core', () => {
     const fit = outlineFromPoints(ring(8, () => 10), 1.6, false)!;

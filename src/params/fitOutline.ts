@@ -55,8 +55,8 @@ export function fitOutlineFromStroke(stroke: [number, number][], wall: number, o
   const sideL = (deg: number) => (mirror ? sideR(deg) : at(180 - deg));
 
   // greedy choice of right-half angles (incl. -90 and 90) that minimizes the worst deviation, for one side
-  const cand: number[] = []; for (let a = -85; a <= 85; a += 5) cand.push(a);
-  const target = Math.round(lerp(4, 11, fid));
+  const cand: number[] = []; for (let a = -87.5; a <= 87.5; a += 2.5) cand.push(a);
+  const target = Math.round(lerp(4, 18, fid));
   const fitHalf = (f: (deg: number) => number) => {
     const fitFor = (angles: number[]) => {
       const prof = new Profile(makeOutline(angles, angles.map(f)));
