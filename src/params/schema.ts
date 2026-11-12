@@ -11,7 +11,6 @@ export type ParamDef = {
 
 export type Params = {
   depth: number; belly: number; backFlat: number; plateau: number; corePlateau: boolean;
-  scaleW: number; scaleH: number; // the whole outline scaled across and up (the Core keeps its size)
   eyes: 'two' | 'one' | 'none'; eyeSize: number; eyeSpacing: number; eyeHeight: number; eyeX: number; eyeType: 'inset' | 'raised' | 'flush';
   wall: number; splitZ: number; material: MaterialId;
   side: SideProfile;
@@ -26,8 +25,6 @@ export const GROUPS: { id: GroupId; label: string; open: boolean }[] = [
 
 export const SCHEMA: ParamDef[] = [
   { id: 'depth', label: 'Depth', group: 'body', kind: 'range', min: 10, max: 42, step: 0.5, default: 30, unit: 'mm' },
-  { id: 'scaleW', label: 'Width', group: 'body', kind: 'range', min: 0.6, max: 1.6, step: 0.01, default: 1, hint: 'Scale the shape across. The Core keeps its size, so it stops fitting if the body gets too small' },
-  { id: 'scaleH', label: 'Height', group: 'body', kind: 'range', min: 0.6, max: 1.6, step: 0.01, default: 1, hint: 'Scale the shape up and down. The Core keeps its size, so it stops fitting if the body gets too small' },
   { id: 'belly', label: 'Belly', group: 'body', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.5 },
   { id: 'backFlat', label: 'Back flatness', group: 'body', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.5 },
   { id: 'corePlateau', label: 'Flat core seat', group: 'attach', kind: 'toggle', default: false, hint: 'Flat seat and core curvature' },

@@ -11,7 +11,7 @@ export class PadView {
   onChange: () => void = () => {};
   private zoom = 1; private cx: number; private cy: number;
   private pan: { x: number; y: number; cx: number; cy: number; id: number } | null = null;
-  static readonly MIN = 0.7; static readonly MAX = 12;
+  static readonly MIN = 0.3; static readonly MAX = 12;
 
   constructor(private s: SVGSVGElement, private base: { cx: number; cy: number; w: number; h: number }) {
     this.cx = base.cx; this.cy = base.cy; this.apply();

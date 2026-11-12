@@ -35,6 +35,9 @@ export class Panel {
   private inputs = new Map<string, { set: (v: any) => void }>();
   onParam: (id: keyof Params, value: number | string, final: boolean) => void = () => {};
   onLook: (look: Look) => void = () => {};
+  /** the shape's true width / height in mm was set (final = released); the caller resizes the outline */
+  onSize: (axis: 'w' | 'h', mm: number, final: boolean) => void = () => {};
+  private sizeSet: { w: (v: number) => void; h: (v: number) => void } | null = null;
   private swatchBtns: HTMLButtonElement[] = [];
   private finishBtns: HTMLButtonElement[] = [];
   private colorInput = h('input', { type: 'color', class: 'color-input', title: 'Custom color' }) as HTMLInputElement;
@@ -55,7 +58,10 @@ export class Panel {
     this.expandBtn = h('button', { type: 'button', class: 'ui-btn icon-btn card-tool', 'aria-label': 'Expand the canvas', onClick: (e: Event) => { e.preventDefault(); e.stopPropagation(); this.onExpand(); } }) as HTMLButtonElement;
     this.setExpanded(false);
     this.body.append(this.card('Canvas', true, h('div', { class: 'canvas-stack' }, h('div', { class: 'canvas-slot' }, parts.outline), h('div', { class: 'canvas-slot' }, parts.side)), undefined, [this.expandBtn]));
-    for (const g of GROUPS) this.body.append(this.card(g.label, g.open, h('div', { class: 'ui-card-body' }, ...SCHEMA.filter((d) => d.group === g.id).map((d) => this.row(d)))));
+    // the shape's true size (mm, the bounding box in the front view): resizes the outline points, so what the canvas shows is what is built
+    const sizeRow = (axis: 'w' | 'h') => { const rc = rangeControl({ label: axis === 'w' ? 'Width' : 'Height', min: 20, max: 160, step: 0.5, unit: 'mm', value: 50, hint: 'The shape\'s true size, front view. Resizes the outline points; the Core keeps its size', onInput: (v) => this.onSize(axis, v, false), onChange: (v) => this.onSize(axis, v, true) }); return rc; };
+    const wRow = sizeRow('w'), hRow = sizeRow('h'); this.sizeSet = { w: wRow.set, h: hRow.set };
+    for (const g of GROUPS) this.body.append(this.card(g.label, g.open, h('div', { class: 'ui-card-body' }, ...(g.id === 'body' ? [wRow.el, hRow.el] : []), ...SCHEMA.filter((d) => d.group === g.id).map((d) => this.row(d)))));
     this.body.append(this.card('Material', true, this.materialBody()));
     this.body.append(this.card('Core', false, this.coreBody(), 'global'));
     [...this.body.querySelectorAll(':scope > .ui-card')].slice(0, 1).forEach((c) => c.classList.add('sketch-card')); // Canvas (both pads) moves to the canvas when expanded
@@ -158,6 +164,8 @@ export class Panel {
     this.refreshFinishes();
   }
   setLook(look: Look) { this.look = { ...look }; this.paintLook(); }
+  /** show the shape's true size (mm) in the Width and Height controls */
+  setSize(w: number, hgt: number) { this.sizeSet?.w(w); this.sizeSet?.h(hgt); }
   setParams(p: Params) { for (const [k, v] of Object.entries(p)) this.inputs.get(k)?.set(v as any); this.material = p.material; this.refreshFinishes(); }
   lock(on: boolean) { this.el.classList.toggle('locked', on); }
 }

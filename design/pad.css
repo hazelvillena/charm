@@ -27,6 +27,8 @@
 .ui-pad-dp.mir { fill: var(--accent); fill-opacity: 0.35; }
 .ui-pad-svg.pointing { cursor: crosshair; }
 .ui-pad-marquee { fill: var(--accent); fill-opacity: 0.08; stroke: var(--accent); stroke-width: var(--pad-hair); stroke-dasharray: 3 2; pointer-events: none; }
+.ref-pick { display: inline-flex; align-items: center; gap: var(--s-2); }
+.ui-mini-select { font: inherit; font-size: 11px; color: var(--ink-2); background: transparent; border: 1px solid var(--line); border-radius: var(--r-1, 6px); padding: 1px 4px; max-width: 120px; }
 .ui-pad-note { font-size: 3px; fill: var(--ink-3); pointer-events: none; }
 .ui-pad-note.bad { fill: var(--bad); }
 .ui-pad-result { fill: none; stroke: var(--ink); stroke-width: 1.4px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }

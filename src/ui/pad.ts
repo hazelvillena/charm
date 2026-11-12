@@ -40,7 +40,7 @@ export class Pad {
     grip.addEventListener('pointerdown', (e) => {
       e.preventDefault(); try { grip.setPointerCapture(e.pointerId); } catch { /* optional */ }
       const y0 = e.clientY, h0 = this.svg.getBoundingClientRect().height; grip.classList.add('drag');
-      const move = (ev: PointerEvent) => { const hgt = Math.round(Math.min(720, Math.max(140, h0 + ev.clientY - y0))); this.svg.style.height = `${hgt}px`; this.svg.style.aspectRatio = 'auto'; this.svg.style.maxHeight = 'none'; };
+      const move = (ev: PointerEvent) => { const hgt = Math.round(Math.min(6000, Math.max(140, h0 + ev.clientY - y0))); this.svg.style.height = `${hgt}px`; this.svg.style.aspectRatio = 'auto'; this.svg.style.maxHeight = 'none'; };
       const up = () => { grip.classList.remove('drag'); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); };
       grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
     });

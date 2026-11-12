@@ -5,7 +5,7 @@ import { Store, ViewMode, Analysis } from './store';
 import { ShapeEngine } from './geometry/engine';
 import { ShapeInfo } from './geometry/shapeMap';
 import { bounds, signedVolume } from './geometry/mesh';
-import { Profile } from './geometry/profile';
+import { Profile, outlineExtent, resizeOutline } from './geometry/profile';
 import { placeFeatures, Placement } from './geometry/features';
 import { SceneView } from './scene/scene';
 import { buildReferenceGhost } from './scene/referenceGhost';
@@ -202,8 +202,12 @@ function revert(reason: string) {
 
 function markDirty() { dirty = true; clearTimeout(settleTimer); settleTimer = window.setTimeout(settle, 150); }
 
+/** the body's true size (mm) as built: shown in the Width / Height controls; a drag on them resizes the outline from where the drag started */
+let lastBody = { w: 50, h: 60 };
+let sizeBase: { outline: ReturnType<typeof cloneOutline>; w: number; h: number; ew: number; eh: number } | null = null; // body size and outline size when the drag started
 function pushLive(b: ReturnType<typeof bounds>) {
   const p = store.state.params;
+  lastBody = { w: b.size[0], h: b.size[1] }; if (!sizeBase) panel.setSize(lastBody.w, lastBody.h);
   outputs.setLive({ w: b.size[0], h: b.max[1], d: b.size[2], shellCm3: est.shellCm3, weightG: est.weightG, material: p.material, splitZ: p.splitZ * p.depth });
 }
 
@@ -310,7 +314,7 @@ function runChecks() {
   const s = store.state;
   const results: Record<string, CheckResult> = {};
   try {
-    const prof = new Profile(scaleOutline(s.outline, s.params.scaleW ?? 1, s.params.scaleH ?? 1, s.params.wall));
+    const prof = new Profile(s.outline);
     if (computeInner()) {
       const inner = innerGeometry(innerL2, engine.smoothFaces(2));
       const w = checkWall(view.geometry(2), inner.bvh, s.params.wall);
@@ -389,12 +393,21 @@ window.addEventListener('keydown', (e) => {
 editor.onChange = (o, final) => { store.state.outline = o; modified(); if (final) commit(); };
 // revert: each canvas goes back to how it was when this iteration was loaded or last saved
 let baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) };
-const captureBaseline = () => { baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) }; };
+editor.setSaved(baseline.outline);
+const captureBaseline = () => { baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) }; editor.setSaved(baseline.outline); };
 editor.onEye = (idx, x, yRel, final) => { // drag an eye on the canvas: the pair moves together, independent of the Core
   const p = store.state.params, half = p.eyeSpacing / 2, c = p.eyes === 'two' ? (idx === 0 ? x + half : x - half) : x;
   p.eyeX = Math.min(25, Math.max(-25, Math.round(c * 10) / 10));
   if (info) p.eyeHeight = Math.min(0.95, Math.max(0.3, (yRel + info.shiftY) / height));
   panel.setParams(p); modified(); if (final) commit();
+};
+panel.onSize = (axis, mm, final) => {
+  if (!sizeBase) { const e = outlineExtent(store.state.outline); sizeBase = { outline: cloneOutline(store.state.outline), w: lastBody.w, h: lastBody.h, ew: e.w, eh: e.h }; }
+  // the control shows the built body; the body is a hair smaller than its outline, so ask the outline for the same amount more
+  const tw = axis === 'w' ? mm + (sizeBase.ew - sizeBase.w) : sizeBase.ew, th = axis === 'h' ? mm + (sizeBase.eh - sizeBase.h) : sizeBase.eh;
+  const o = resizeOutline(sizeBase.outline, tw, th, store.state.params.wall); // the outline's points move: the canvas, the body and the print all agree
+  editor.set(o, store.state.params.wall); editor.onChange(o, final);
+  if (final) { sizeBase = null; panel.setSize(lastBody.w, lastBody.h); }
 };
 editor.onReset = () => { const o = cloneOutline(baseline.outline); editor.set(o, store.state.params.wall); editor.onChange(o, true); };
 sideEditor.onReset = () => { const sd = cloneSide(baseline.side); sideEditor.onChange(sd, true); };
@@ -471,7 +484,9 @@ function animateTo(toOutline: Outline, toParams: Params, meta: { name: string; l
 }
 
 // ---- library: saved iterations, live-updated when the global params change ----
-const library = new Library(() => { libPanel.render(library.items); toolbar.setLibraryCount(library.items.length); renderChips(); });
+const syncReferences = () => editor.setReferences(library.items.map((i) => ({ id: i.id, name: i.name, outline: i.outline }))); // the canvas reference picker lists the library
+const library = new Library(() => { libPanel.render(library.items); toolbar.setLibraryCount(library.items.length); renderChips(); syncReferences(); });
+syncReferences();
 function renderChips() { toolbar.setChips(library.starred().map((i) => ({ id: i.id, name: i.name })), store.state.libraryId); }
 let thumbs: ThumbRenderer | null = null;
 let refreshToken = 0;

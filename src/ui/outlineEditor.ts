@@ -35,7 +35,8 @@ export class OutlineEditor {
   private coreDrag: { y0: number; outline0: Outline; cx: number; cy: number } | null = null; private issueDeg: number | null = null;
   private outline!: Outline;
   private wall = 1.6;
-  private showRef = false;
+  /** the reference drawn faintly behind the outline: none, the original Charmer, this iteration as saved, or another iteration */
+  private refMode = 'none'; private refSel!: HTMLSelectElement; private refItems: { id: string; name: string; outline: Outline }[] = []; private savedOutline: Outline | null = null;
   private active = -1; private selected = -1; private activeSide: Side = 'R'; private selSide: Side = 'R';
   private mirror = true; private mirrorInput!: HTMLInputElement; private curveInput!: HTMLInputElement;
   /** several points selected at once (Cmd/Ctrl-click, a Cmd/Ctrl-drag box, Cmd/Ctrl+A): keys like 'R:3' / 'L:5'; they move together */
@@ -109,7 +110,9 @@ export class OutlineEditor {
     const mirrorToggle = h('label', { class: 'mini-toggle', title: 'Mirror the left side of the shape from the right. Off: draw each side on its own' }, this.mirrorInput, h('span', { text: 'Mirror' }));
     this.curveInput = h('input', { type: 'checkbox', onChange: () => this.setCurve(this.curveInput.checked) }) as HTMLInputElement;
     const curveToggle = h('label', { class: 'mini-toggle', title: 'Join the points with a truly smooth curve (older shapes use the original curve, which lumps at each point)' }, this.curveInput, h('span', { text: 'Smooth curve' }));
-    const refToggle = h('label', { class: 'mini-toggle' }, h('input', { type: 'checkbox', onChange: (e: Event) => { this.showRef = (e.target as HTMLInputElement).checked; this.render(); this.onRef?.(this.showRef); } }), h('span', { text: 'Original' }));
+    this.refSel = h('select', { class: 'ui-mini-select', 'aria-label': 'Reference outline', title: 'Show another outline faintly behind this one, to compare against', onChange: () => this.setRef(this.refSel.value) }) as HTMLSelectElement;
+    this.fillRefOptions();
+    const refToggle = h('label', { class: 'mini-toggle ref-pick' }, h('span', { text: 'Reference' }), this.refSel);
     this.busy = h('div', { class: 'ui-busy hidden' }, h('div', { class: 'ui-spinner' }), h('span', { text: 'Shaping…' }));
 
     // top row: how many points, and straight versus curved
@@ -137,6 +140,19 @@ export class OutlineEditor {
       h('div', { class: 'outline-stage' }, this.pad.el, this.busy));
     this.setDrawKind('points'); this.setMode('edit');
   }
+
+  private fillRefOptions() {
+    const cur = this.refMode; this.refSel.replaceChildren();
+    const add = (value: string, text: string) => { const o = document.createElement('option'); o.value = value; o.textContent = text; this.refSel.append(o); };
+    add('none', 'None'); add('original', 'Original Charmer'); add('saved', 'This one, as saved');
+    for (const it of this.refItems) add('it:' + it.id, it.name);
+    this.refSel.value = [...this.refSel.options].some((o) => o.value === cur) ? cur : 'none'; this.refMode = this.refSel.value;
+  }
+  private setRef(v: string) { this.refMode = v; this.render(); this.onRef?.(v === 'original'); }
+  /** the outlines of the library, to pick as a reference */
+  setReferences(items: { id: string; name: string; outline: Outline }[]) { this.refItems = items; this.fillRefOptions(); this.render(); }
+  /** this iteration as it was loaded or last saved */
+  setSaved(outline: Outline) { this.savedOutline = cloneOutline(outline); if (this.refMode === 'saved') this.render(); }
 
   set(outline: Outline, wall: number) {
     this.outline = outline; this.wall = wall;
@@ -485,11 +501,14 @@ export class OutlineEditor {
     this.paintIssue(); this.paintEyes();
     this.points.set(n, OUTLINE_MIN_POINTS, OUTLINE_MAX_POINTS);
     this.smoothInput.value = String(this.outline.smooth); this.paintSmooth();
-    if (this.showRef) {
+    if (this.refMode === 'original') {
       const pts: [number, number][] = [];
       GHOST_SILHOUETTE.forEach((r, i) => { const a = (-90 + i * 2.5) * DEG; pts.push([r * Math.cos(a), -r * Math.sin(a)]); });
       for (let i = GHOST_SILHOUETTE.length - 2; i >= 1; i--) { const r = GHOST_SILHOUETTE[i]; const a = (-90 + i * 2.5) * DEG; pts.push([-r * Math.cos(a), -r * Math.sin(a)]); }
       this.ref.setAttribute('d', pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join('') + 'Z'); this.ref.style.display = '';
-    } else this.ref.style.display = 'none';
+    } else {
+      const other = this.refMode === 'saved' ? this.savedOutline : this.refMode.startsWith('it:') ? this.refItems.find((x) => x.id === this.refMode.slice(3))?.outline ?? null : null;
+      if (other) { this.ref.setAttribute('d', pathOf(other)); this.ref.style.display = ''; } else this.ref.style.display = 'none';
+    }
   }
 }

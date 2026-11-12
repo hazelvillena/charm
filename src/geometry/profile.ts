@@ -1,4 +1,4 @@
-import { Outline, ringOf } from '../params/outline';
+import { Outline, ringOf, scaleOutline } from '../params/outline';
 import { smoothRing } from './smoothRing';
 
 const TWO_PI = Math.PI * 2;
@@ -122,4 +122,27 @@ export class SideCurve {
     const spline = M[i] * (t1 - c) ** 3 / (6 * h) + M[i + 1] * (c - t0) ** 3 / (6 * h) + (v[i] / h - M[i] * h / 6) * (t1 - c) + (v[i + 1] / h - M[i + 1] * h / 6) * (c - t0);
     return Math.min(2, Math.max(0.15, s * spline + (1 - s) * (v[i] + (v[i + 1] - v[i]) * ((c - t0) / h)))); // a spline can overshoot a little between points; keep it sane
   }
+}
+
+/** the outline's true size in the front view (mm): its bounding box across and up */
+export function outlineExtent(o: Outline): { w: number; h: number } {
+  const p = new Profile(o); let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+  for (let d = 0; d < 720; d++) { const a = d * 0.5 * Math.PI / 180, r = p.radius(a), x = r * Math.cos(a), y = r * Math.sin(a); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return { w: x1 - x0, h: y1 - y0 };
+}
+
+/**
+ * The outline resized to a true width and height (mm, front view bounding box): the control points are scaled, then the two scales are
+ * corrected a few times against the measured size (the curve between points is not an exact stretch, so one pass lands a little short).
+ * Stops early where the Core limits how small it can get.
+ */
+export function resizeOutline(base: Outline, width: number, height: number, wall: number): Outline {
+  let sx = 1, sy = 1, best = base;
+  for (let i = 0; i < 8; i++) {
+    best = scaleOutline(base, sx, sy, wall);
+    const e = outlineExtent(best), ew = width / Math.max(1e-6, e.w), eh = height / Math.max(1e-6, e.h);
+    if (Math.abs(ew - 1) < 0.002 && Math.abs(eh - 1) < 0.002) break;
+    sx *= ew; sy *= eh;
+  }
+  return best;
 }
