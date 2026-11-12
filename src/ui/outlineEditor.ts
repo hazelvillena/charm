@@ -27,6 +27,7 @@ export class OutlineEditor {
   private result: SVGPathElement; private showResultOn = true;
   private path: SVGPathElement; private ref: SVGPathElement; private preview: SVGPathElement; private sketch: SVGPathElement;
   private keep: SVGCircleElement; private keepLabel: SVGTextElement; private puckC: SVGCircleElement;
+  private eyesG: SVGGElement; private eyeDrag = -1; private addHint: SVGCircleElement;
   private handlesG: SVGGElement; private hand: SVGGElement; private issue: SVGCircleElement;
   private coreDrag: { y0: number; outline0: Outline; cx: number; cy: number } | null = null; private issueDeg: number | null = null;
   private outline!: Outline;
@@ -48,6 +49,8 @@ export class OutlineEditor {
   private genBtn: HTMLButtonElement;
   onChange: (o: Outline, final: boolean) => void = () => {};
   onReset: () => void = () => {};
+  /** dragging an eye marker: its index, and where it is now (mm, Core centre = origin, y up) */
+  onEye: (idx: number, x: number, y: number, final: boolean) => void = () => {};
   onRef: ((show: boolean) => void) | null = null;
   /** called with the fitted outline after Generate (or null + reason if the stroke could not be used) */
   onDrawn: (fit: StrokeFit | null) => void = () => {};
@@ -64,18 +67,21 @@ export class OutlineEditor {
     this.puckC = svg('circle', { cx: 0, cy: 0, class: 'ui-pad-core' }) as SVGCircleElement;
     this.keepLabel = svg('text', { x: 0, y: 0, class: 'ui-pad-note', 'text-anchor': 'middle' }) as SVGTextElement;
     this.handlesG = svg('g') as SVGGElement;
+    this.eyesG = svg('g', { class: 'ui-pad-eyes' }) as SVGGElement;
+    this.addHint = svg('circle', { class: 'ui-pad-addhint' }) as SVGCircleElement; this.addHint.style.display = 'none';
     this.preview = svg('path', { class: 'ui-pad-preview' }) as SVGPathElement;
     this.sketch = svg('path', { class: 'ui-pad-stroke' }) as SVGPathElement;
     this.hand = svg('g', { class: 'ui-pad-glyph' }) as SVGGElement;
     this.hand.append(svg('path', { d: 'M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15' }));
     this.issue = svg('circle', { class: 'ui-pad-issue' }) as SVGCircleElement; this.issue.style.display = 'none';
-    this.s.append(this.ref, this.keep, this.path, this.result, this.puckC, this.hand, this.keepLabel, this.handlesG, this.issue, this.preview, this.sketch);
+    this.s.append(this.ref, this.keep, this.path, this.result, this.puckC, this.hand, this.keepLabel, this.eyesG, this.handlesG, this.addHint, this.issue, this.preview, this.sketch);
     this.pad.view.onChange = () => this.render();
     this.pad.onRevert = () => this.onReset();
     this.pad.onDelete = () => this.deleteSelected();
     this.s.addEventListener('keydown', (e) => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deleteSelected(); } else if (e.key === 'Escape') { this.select(-1); } });
     this.s.addEventListener('pointerdown', (e) => { this.s.focus({ preventScroll: true }); this.onDown(e); });
     this.s.addEventListener('pointermove', (e) => this.onMove(e));
+    this.s.addEventListener('pointerleave', () => { this.addHint.style.display = 'none'; });
     this.s.addEventListener('pointerup', (e) => this.onUp(e));
     this.s.addEventListener('pointercancel', (e) => this.onUp(e));
 
@@ -120,6 +126,21 @@ export class OutlineEditor {
     this.result.setAttribute('d', d);
   }
 
+  /** the eyes as draggable markers (mm, Core centre = origin, y up); an empty list hides them */
+  setEyes(pts: { x: number; y: number }[]) {
+    this.eyesPts = pts; this.paintEyes();
+  }
+  private eyesPts: { x: number; y: number }[] = [];
+  private paintEyes() {
+    const u = this.pad.unit(), n = this.eyesPts.length;
+    if (this.eyesG.childElementCount !== n) {
+      this.eyesG.replaceChildren();
+      for (let i = 0; i < n; i++) { const c = svg('circle', { class: 'ui-pad-eye' }); (c as SVGElement).dataset.i = String(i); this.eyesG.append(c); }
+    }
+    this.eyesPts.forEach((p, i) => { const c = this.eyesG.children[i]; c.setAttribute('cx', p.x.toFixed(2)); c.setAttribute('cy', (-p.y).toFixed(2)); c.setAttribute('r', (5 * u).toFixed(3)); });
+    this.eyesG.style.display = this.mode === 'edit' ? '' : 'none';
+  }
+
   /** mark where a check needs attention (angle on the outline, degrees) or clear it */
   setIssue(deg: number | null) { this.issueDeg = deg; this.paintIssue(); }
   private paintIssue() {
@@ -134,7 +155,7 @@ export class OutlineEditor {
     this.handlesG.style.display = m === 'edit' ? '' : 'none';
     this.s.classList.toggle('drawing', m === 'draw');
     this.pad.top.classList.toggle('hidden', m !== 'edit');
-    this.hand.style.display = m === 'edit' ? '' : 'none';
+    this.hand.style.display = m === 'edit' ? '' : 'none'; this.paintEyes();
     this.drawCtl.classList.add('hidden');
   }
 
@@ -164,6 +185,8 @@ export class OutlineEditor {
       this.capture(e); this.addStrokePoint(e); return;
     }
     const target = e.target as SVGElement;
+    const eye = target.closest('.ui-pad-eye') as SVGElement | null;
+    if (eye) { this.eyeDrag = +eye.dataset.i!; eye.classList.add('drag'); this.capture(e); e.preventDefault(); return; }
     const pt = target.closest('.ui-pad-pt:not(.mirror)') as SVGGElement | null;
     if (pt) { this.active = +pt.dataset.i!; this.selected = this.active; this.render(); pt.classList.add('drag'); this.capture(e); e.preventDefault(); return; }
     if (target.classList.contains('ui-pad-core') || target.closest('.ui-pad-glyph')) { // the Core: drag it up or down inside the body
@@ -171,17 +194,31 @@ export class OutlineEditor {
       this.s.classList.add('moving-core'); this.capture(e); e.preventDefault(); return;
     }
     // click on the curve adds a point and starts dragging it
-    const [x, y] = this.toSvg(e); const mx = Math.abs(x);
-    const phi = Math.atan2(y, mx), r = Math.hypot(x, y);
-    const near = Math.abs(r - new Profile(this.outline).radius(phi)) < 3.4 * this.pad.unit() / 0.4 * 0.4 + 2.2 && Math.abs(phi) < Math.PI / 2 - OUTLINE_MIN_GAP_DEG * DEG * 0.9;
-    if (!near) { if (this.selected >= 0) this.select(-1); this.pad.view.startPan(e); return; }
+    const hit = this.curveHit(e);
+    if (!hit) { if (this.selected >= 0) this.select(-1); this.pad.view.startPan(e); return; }
+    const phi = hit.phi;
     const ins = insertPoint(this.outline, phi, this.wall);
     if (!ins) return;
     this.outline = ins.outline; this.active = ins.index; this.selected = ins.index; this.capture(e); this.render(); this.onChange(this.outline, false);
   }
 
+  /** where the pointer is close enough to the outline to add a point there (angle on the right half), or null */
+  private curveHit(e: PointerEvent): { phi: number; x: number; y: number } | null {
+    const [x, y] = this.toSvg(e), mx = Math.abs(x), phi = Math.atan2(y, mx), r = Math.hypot(x, y);
+    const R = new Profile(this.outline).radius(phi);
+    const near = Math.abs(r - R) < 3.4 * this.pad.unit() / 0.4 * 0.4 + 2.2 && Math.abs(phi) < Math.PI / 2 - OUTLINE_MIN_GAP_DEG * DEG * 0.9;
+    return near ? { phi, x: Math.sign(x || 1) * R * Math.cos(phi), y: R * Math.sin(phi) } : null;
+  }
+  private showAddHint(e: PointerEvent) {
+    const hit = this.mode === 'edit' && this.active < 0 && !this.coreDrag && this.eyeDrag < 0 && !(e.target as Element).closest?.('.ui-pad-pt, .ui-pad-eye, .ui-pad-core') && this.outline.phi.length < OUTLINE_MAX_POINTS ? this.curveHit(e) : null;
+    if (!hit) { this.addHint.style.display = 'none'; return; }
+    this.addHint.setAttribute('cx', hit.x.toFixed(2)); this.addHint.setAttribute('cy', (-hit.y).toFixed(2)); this.addHint.setAttribute('r', (4 * this.pad.unit()).toFixed(3)); this.addHint.style.display = '';
+  }
+
   private onMove(e: PointerEvent) {
+    this.showAddHint(e);
     if (this.mode === 'draw') { if (this.drawing) this.addStrokePoint(e); return; }
+    if (this.eyeDrag >= 0) { const [x, y] = this.toSvg(e); this.onEye(this.eyeDrag, x, y, false); return; }
     if (this.coreDrag) {
       const u = this.pad.unit(), dy = (this.coreDrag.y0 - e.clientY) * u; // mm the Core has moved up
       const o = recenterOutline(this.coreDrag.outline0, dy, this.wall);
@@ -202,6 +239,7 @@ export class OutlineEditor {
   private onUp(e: PointerEvent) {
     try { this.s.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
     if (this.mode === 'draw') { this.finishStroke(); return; }
+    if (this.eyeDrag >= 0) { const [x, y] = this.toSvg(e); this.eyesG.querySelector('.drag')?.classList.remove('drag'); const i = this.eyeDrag; this.eyeDrag = -1; this.onEye(i, x, y, true); return; }
     if (this.coreDrag) { this.coreDrag = null; this.s.classList.remove('moving-core'); this.onChange(this.outline, true); return; }
     if (this.active < 0) return;
     this.handlesG.querySelector('.drag')?.classList.remove('drag');
@@ -274,7 +312,7 @@ export class OutlineEditor {
     if (this.selected >= n) this.selected = -1;
     Array.from(this.handlesG.children).forEach((el, k) => el.classList.toggle('sel', k === this.selected));
     this.pad.setCanDelete(this.selected > 0 && this.selected < n - 1 && n > OUTLINE_MIN_POINTS);
-    this.paintIssue();
+    this.paintIssue(); this.paintEyes();
     this.points.set(n, OUTLINE_MIN_POINTS, OUTLINE_MAX_POINTS);
     this.smoothInput.value = String(this.outline.smooth); this.paintSmooth();
     if (this.showRef) {

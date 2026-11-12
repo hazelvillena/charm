@@ -234,6 +234,7 @@ function placeFeaturesAt(level: number) {
   try {
     place = placeFeatures(view.bvh(level), view.geometry(level), store.state.params, info.shiftY, height);
     view.setFeatures(place, store.state.params);
+    editor.setEyes(place.eyes.filter((e): e is NonNullable<typeof e> => !!e).map((e) => ({ x: e.point.x, y: e.point.y - info!.shiftY })));
   } catch (e) { console.warn('feature placement failed', e); }
 }
 
@@ -389,6 +390,12 @@ editor.onChange = (o, final) => { store.state.outline = o; modified(); if (final
 // revert: each canvas goes back to how it was when this iteration was loaded or last saved
 let baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) };
 const captureBaseline = () => { baseline = { outline: cloneOutline(store.state.outline), side: cloneSide(store.state.params.side) }; };
+editor.onEye = (idx, x, yRel, final) => { // drag an eye on the canvas: the pair moves together, independent of the Core
+  const p = store.state.params, half = p.eyeSpacing / 2, c = p.eyes === 'two' ? (idx === 0 ? x + half : x - half) : x;
+  p.eyeX = Math.min(25, Math.max(-25, Math.round(c * 10) / 10));
+  if (info) p.eyeHeight = Math.min(0.95, Math.max(0.3, (yRel + info.shiftY) / height));
+  panel.setParams(p); modified(); if (final) commit();
+};
 editor.onReset = () => { const o = cloneOutline(baseline.outline); editor.set(o, store.state.params.wall); editor.onChange(o, true); };
 sideEditor.onReset = () => { const sd = cloneSide(baseline.side); sideEditor.onChange(sd, true); };
 editor.onRef = (show) => {

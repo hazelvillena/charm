@@ -80,10 +80,11 @@ export function placeFeatures(bvh: MeshBVH, geo: BufferGeometry, p: Params, shif
   const dn = new Vector3(0, 0, -1);
   // eyes never sit on the core: if the requested height would put them inside the clearance zone they slide up above it
   const half = p.eyeSpacing / 2, zone = eyeClearance(p);
-  const minY = shiftY + Math.sqrt(Math.max(0, zone * zone - half * half));
+  // (a pair slid sideways clears the core sooner: the zone is measured from the nearer eye)
+  const nearX = Math.max(0, Math.abs(p.eyeX ?? 0) - half), minY = shiftY + Math.sqrt(Math.max(0, zone * zone - (p.eyes === 'one' ? Math.abs(p.eyeX ?? 0) : nearX) ** 2));
   const eyeY = Math.max(p.eyeHeight * height, minY);
   // two eyes, a single centred eye, or none (the array always has two slots; an empty slot is simply hidden)
-  const mode = p.eyes ?? 'two', xs: (number | null)[] = mode === 'none' ? [null, null] : mode === 'one' ? [0, null] : [-half, half];
+  const cx = p.eyeX ?? 0, mode = p.eyes ?? 'two', xs: (number | null)[] = mode === 'none' ? [null, null] : mode === 'one' ? [cx, null] : [cx - half, cx + half];
   const eyes = xs.map((x) => {
     if (x === null) return null;
     const h = castSurface(bvh, geo, new Vector3(x, eyeY, 300), dn);

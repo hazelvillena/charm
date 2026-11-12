@@ -19,6 +19,9 @@
 .ui-pad-keep { fill: rgba(91, 108, 255, 0.05); stroke: var(--accent); stroke-width: var(--pad-hair); stroke-dasharray: 3 3; }
 .ui-pad-keep.bad { stroke: var(--bad); fill: rgba(229, 72, 77, 0.08); }
 .ui-pad-core { fill: var(--surface); fill-opacity: 0.85; stroke: var(--line-strong); stroke-width: var(--pad-hair); cursor: grab; }
+.ui-pad-eye { fill: var(--ink); fill-opacity: 0.85; stroke: var(--surface); stroke-width: var(--pad-hair); cursor: grab; }
+.ui-pad-eye.drag { cursor: grabbing; fill: var(--accent-ink); }
+.ui-pad-addhint { fill: var(--surface); stroke: var(--accent); stroke-width: var(--pad-line); stroke-dasharray: 2 1.5; pointer-events: none; opacity: 0.9; }
 .ui-pad-note { font-size: 3px; fill: var(--ink-3); pointer-events: none; }
 .ui-pad-note.bad { fill: var(--bad); }
 .ui-pad-result { fill: none; stroke: var(--ink); stroke-width: 1.4px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }

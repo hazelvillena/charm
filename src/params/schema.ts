@@ -11,7 +11,7 @@ export type ParamDef = {
 
 export type Params = {
   depth: number; belly: number; backFlat: number; plateau: number; corePlateau: boolean;
-  eyes: 'two' | 'one' | 'none'; eyeSize: number; eyeSpacing: number; eyeHeight: number; eyeType: 'inset' | 'raised' | 'flush';
+  eyes: 'two' | 'one' | 'none'; eyeSize: number; eyeSpacing: number; eyeHeight: number; eyeX: number; eyeType: 'inset' | 'raised' | 'flush';
   wall: number; splitZ: number; material: MaterialId;
   side: SideProfile;
 };
@@ -32,7 +32,8 @@ export const SCHEMA: ParamDef[] = [
   { id: 'eyes', label: 'Eyes', group: 'face', kind: 'enum', options: ['two', 'one', 'none'], default: 'two', hint: 'Two eyes, a single centred eye, or none' },
   { id: 'eyeSize', label: 'Eye size', group: 'face', kind: 'range', min: 1, max: 4, step: 0.2, default: 2.4, unit: 'mm' },
   { id: 'eyeSpacing', label: 'Eye spacing', group: 'face', kind: 'range', min: 3, max: 12, step: 0.5, default: 5.5, unit: 'mm' },
-  { id: 'eyeHeight', label: 'Eye height', group: 'face', kind: 'range', min: 0.55, max: 0.92, step: 0.005, default: 0.78 },
+  { id: 'eyeHeight', label: 'Eye height', group: 'face', kind: 'range', min: 0.3, max: 0.95, step: 0.005, default: 0.78, hint: 'Where the eyes sit up the body. Drag them on the canvas too' },
+  { id: 'eyeX', label: 'Eye position', group: 'face', kind: 'range', min: -25, max: 25, step: 0.5, default: 0, unit: 'mm', hint: 'Slide the eyes left or right, independent of the Core' },
   { id: 'eyeType', label: 'Eye type', group: 'face', kind: 'enum', options: ['inset', 'raised', 'flush'], default: 'inset' },
   { id: 'wall', label: 'Wall thickness', group: 'mfg', kind: 'range', min: 1.2, max: 2.5, step: 0.1, default: 1.6, unit: 'mm' },
   { id: 'splitZ', label: 'Split line', group: 'mfg', kind: 'range', min: -0.5, max: 0.5, step: 0.05, default: 0 },

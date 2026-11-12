@@ -1,6 +1,7 @@
 import { Outline, makeOutline } from './outline';
 import { Params, defaultParams } from './schema';
 import { Look } from '../../design/finishes';
+import { decodeShare } from '../io/share';
 
 /**
  * Starter iterations for a first-time library: smooth, abstract, analytic shapes (every outline is a smooth function of
@@ -18,7 +19,12 @@ const polar = (fn: (phi: number) => number, n: number, smooth = 1): Outline => {
 const sinc = (phi: number) => Math.sin(phi);
 const bump = (phi: number, at: number, w: number) => Math.exp(-(((phi - at * D) / w) ** 2));
 
+/** a saved shape kept forever: the share code of the iteration, decoded into a starter (exactly as it was saved) */
+const saved = (code: string): Starter => { const d = decodeShare(code)!; return { name: d.name, outline: d.outline, params: { ...d.params, eyeSize: Math.round(d.params.eyeSize * 10) / 10 }, look: d.look }; }; // (float noise in the code: 2.4000000000000004 is 2.4)
+const BLOB10 = 'eyJ2IjoyLCJwIjp7ImRlcHRoIjozMCwiYmVsbHkiOjAuNSwiYmFja0ZsYXQiOjAuNSwiY29yZVBsYXRlYXUiOmZhbHNlLCJwbGF0ZWF1IjowLjgsImV5ZXMiOiJ0d28iLCJleWVTaXplIjoyLjQwMDAwMDAwMDAwMDAwMDQsImV5ZVNwYWNpbmciOjQuNSwiZXllSGVpZ2h0IjowLjY1LCJleWVUeXBlIjoiaW5zZXQiLCJ3YWxsIjoxLjYsInNwbGl0WiI6MCwibWF0ZXJpYWwiOiJQQy9BQlMiLCJzaWRlIjp7ImJhY2siOlswLjMsMS4wOTA0NzM5Nzg0ODc3ODgyLDEuMzgwNDkyNDkyNzgwMzQ2MSwwLjg0NzQ0ODkyNDM1Njk5NjEsMC42NzUyMTE2MDU3MDQ1NTcxXSwiZnJvbnQiOlsxLjEyNTIwMTgzMzg0NDcyMzQsMSwxLDEsMSwxLDEuMjc0OTIzNzA3NjE2NDYxNV0sInNtb290aCI6MSwiYmFja1QiOlswLDAuMDgzOTg2MzY0Mzc2MDYzMiwwLjE3MjkzMjU4NzM0ODk3MjE2LDAuNTc4Njk4MzMzMTk3NDEwOCwxXX19LCJvIjp7InBoaSI6Wy0xLjU3MSwtMC42NzgsLTAuMDczLDAuMzc3LDAuODQzLDEuMTc4LDEuNTcxXSwiciI6WzIxLjA3NSwyMi45MiwyNS43OTEsMjcuNDg3LDI0LjkwMiwyNy45NywyOC4zOTVdLCJzIjoxfSwibCI6eyJjb2xvciI6IiNFNEU2RUEiLCJmaW5pc2giOiJnbG9zcyJ9LCJuIjoiQmxvYjEwIn0';
+
 export const STARTERS: Starter[] = [
+  saved(BLOB10), // kept from the deployed app (Blob10): PC/ABS, gloss
   // flat base, round top: nothing else in the library has a straight edge on the bottom
   { name: 'Arch', outline: polar((p) => { const flat = 21 / Math.max(1e-3, Math.abs(sinc(p))), k = 2.2, below = p < 0 ? -k * Math.log(Math.exp(-flat / k) + Math.exp(-30 / k)) : 30 - 3 * sinc(p) ** 2; return below; }, 11), params: { depth: 30, belly: 0.5, backFlat: 0.7, eyeHeight: 0.7 }, look: { color: '#F3EEE3', finish: 'matte' } },
   { name: 'Seed', outline: polar((p) => 20 + 13 * Math.abs(sinc(p)) ** 1.6, 9), params: { depth: 26, belly: 0.4, backFlat: 0.4, eyeHeight: 0.7 }, look: { color: '#A9C4F5', finish: 'gloss' } },
